@@ -158,7 +158,7 @@ export async function extractLeafletProducts(input: ExtractLeafletInput): Promis
 
   const response = await client().messages.create({
     model: 'claude-opus-4-8',
-    max_tokens: 8000,
+    max_tokens: 16000,
     thinking: { type: 'adaptive' },
     output_config: { format: { type: 'json_schema', schema } },
     messages: [{ role: 'user', content: [mediaBlock, { type: 'text', text: instruction }] }],

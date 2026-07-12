@@ -12,25 +12,29 @@ interface Product {
   price_regular: number | null
 }
 
-// Zmniejsza obraz do maks. ~1600px i zwraca czysty base64 (bez prefiksu data:)
-async function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }> {
-  if (file.type === 'application/pdf') {
-    const buf = await file.arrayBuffer()
-    let binary = ''
-    const bytes = new Uint8Array(buf)
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-    return { base64: btoa(binary), mediaType: 'application/pdf' }
-  }
-  const dataUrl: string = await new Promise((resolve, reject) => {
+function readDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
     const r = new FileReader()
     r.onload = () => resolve(r.result as string)
-    r.onerror = reject
+    r.onerror = () => reject(new Error('Nie udało się odczytać pliku.'))
     r.readAsDataURL(file)
   })
+}
+
+// Zwraca czysty base64 (bez prefiksu data:). PDF — natywnie; obraz — zmniejszony do ~1600px.
+async function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }> {
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+
+  if (isPdf) {
+    const dataUrl = await readDataUrl(file)
+    return { base64: dataUrl.split(',')[1] ?? '', mediaType: 'application/pdf' }
+  }
+
+  const dataUrl = await readDataUrl(file)
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image()
     i.onload = () => resolve(i)
-    i.onerror = reject
+    i.onerror = () => reject(new Error('Nie udało się wczytać obrazu.'))
     i.src = dataUrl
   })
   const max = 1600
@@ -59,6 +63,12 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    // Limit: base64 nie może przekroczyć limitu żądania Claude (~32 MB)
+    if (file.size > 20 * 1024 * 1024) {
+      setError('Plik za duży (maks. 20 MB). Podziel gazetkę na pojedyncze strony lub zmniejsz PDF.')
+      e.target.value = ''
+      return
+    }
     setExtracting(true)
     setError('')
     setSavedMsg('')
