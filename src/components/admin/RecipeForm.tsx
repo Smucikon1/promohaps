@@ -11,6 +11,8 @@ interface Props {
   stores: Store[]
   categories: Category[]
   recipe?: any
+  // Wstępne dane (np. z generatora AI) — wypełniają NOWY przepis, nie włączają trybu edycji
+  initialData?: any
 }
 
 function slugify(text: string) {
@@ -22,9 +24,10 @@ function slugify(text: string) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-export function RecipeForm({ stores, categories, recipe }: Props) {
+export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
   const router = useRouter()
   const isEdit = !!recipe
+  const seed = recipe ?? initialData
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -33,33 +36,33 @@ export function RecipeForm({ stores, categories, recipe }: Props) {
   const mounted = useRef(false)
 
   // Pola podstawowe
-  const [title, setTitle] = useState(recipe?.title ?? '')
-  const [slug, setSlug] = useState(recipe?.slug ?? '')
-  const [description, setDescription] = useState(recipe?.description ?? '')
-  const [imageUrl, setImageUrl] = useState(recipe?.image_url ?? '')
-  const [storeId, setStoreId] = useState(recipe?.store_id ?? '')
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(recipe?.category_ids ?? [])
-  const [prepTime, setPrepTime] = useState(recipe?.prep_time_min?.toString() ?? '')
-  const [difficulty, setDifficulty] = useState(recipe?.difficulty ?? 'latwy')
-  const [servings, setServings] = useState(recipe?.servings?.toString() ?? '4')
-  const [priceTotal, setPriceTotal] = useState(recipe?.price_total?.toString() ?? '')
-  const [isPublished, setIsPublished] = useState(recipe?.is_published ?? false)
-  const [metaTitle, setMetaTitle] = useState(recipe?.meta_title ?? '')
-  const [metaDesc, setMetaDesc] = useState(recipe?.meta_description ?? '')
+  const [title, setTitle] = useState(seed?.title ?? '')
+  const [slug, setSlug] = useState(seed?.slug ?? '')
+  const [description, setDescription] = useState(seed?.description ?? '')
+  const [imageUrl, setImageUrl] = useState(seed?.image_url ?? '')
+  const [storeId, setStoreId] = useState(seed?.store_id ?? '')
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(seed?.category_ids ?? [])
+  const [prepTime, setPrepTime] = useState(seed?.prep_time_min?.toString() ?? '')
+  const [difficulty, setDifficulty] = useState(seed?.difficulty ?? 'latwy')
+  const [servings, setServings] = useState(seed?.servings?.toString() ?? '4')
+  const [priceTotal, setPriceTotal] = useState(seed?.price_total?.toString() ?? '')
+  const [isPublished, setIsPublished] = useState(seed?.is_published ?? false)
+  const [metaTitle, setMetaTitle] = useState(seed?.meta_title ?? '')
+  const [metaDesc, setMetaDesc] = useState(seed?.meta_description ?? '')
 
   // Składniki
   const [ingredients, setIngredients] = useState<any[]>(
-    recipe?.ingredients ?? [{ id: crypto.randomUUID(), name: '', amount: '', unit: '', price: '', is_promo_product: false, sort_order: 0 }]
+    seed?.ingredients ?? [{ id: crypto.randomUUID(), name: '', amount: '', unit: '', price: '', is_promo_product: false, sort_order: 0 }]
   )
 
   // Kroki
   const [steps, setSteps] = useState<any[]>(
-    recipe?.steps ?? [{ id: crypto.randomUUID(), description: '', step_number: 1, image_url: '' }]
+    seed?.steps ?? [{ id: crypto.randomUUID(), description: '', step_number: 1, image_url: '' }]
   )
 
   // Produkty promocyjne
   const [promos, setPromos] = useState<any[]>(
-    recipe?.promo_products ?? []
+    seed?.promo_products ?? []
   )
 
   // Oznacz formularz jako zmieniony przy dowolnej edycji pól
