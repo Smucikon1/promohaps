@@ -11,6 +11,7 @@ import { ShoppingList } from '@/components/recipe/ShoppingList'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeActions } from '@/components/recipe/RecipeActions'
 import { AddToPlan } from '@/components/recipe/AddToPlan'
+import { AdSlot } from '@/components/ads/AdSlot'
 import { RecipeTracker } from '@/components/recipe/RecipeTracker'
 import { RecordView } from '@/components/recipe/RecordView'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
@@ -247,6 +248,9 @@ export default async function RecipePage({ params }: Props) {
             </div>
           )}
         </div>
+
+        {/* Reklama (nieaktywna do czasu podłączenia AdSense + zgody) */}
+        <AdSlot className="no-print mb-8" />
 
         <div className="grid md:grid-cols-3 gap-8 items-start">
           {/* Lista zakupów — przyklejona na desktopie */}

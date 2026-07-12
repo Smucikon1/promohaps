@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, BookOpen, BarChart3, LogOut, ChefHat } from 'lucide-react'
+import { LayoutDashboard, BookOpen, BarChart3, LogOut, ChefHat, Tag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/przepisy', label: 'Przepisy', icon: BookOpen },
+  { href: '/admin/promocje', label: 'Promocje', icon: Tag },
   { href: '/admin/analityka', label: 'Analityka', icon: BarChart3 },
 ]
 

@@ -3,6 +3,7 @@ import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeFilters } from '@/components/recipe/RecipeFilters'
 import { SearchBar } from '@/components/recipe/SearchBar'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
+import { AdSlot } from '@/components/ads/AdSlot'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Store, Category } from '@/types'
@@ -180,6 +181,29 @@ export default async function HomePage({ searchParams }: HomeProps) {
         <Suspense key={resultsKey} fallback={<GridSkeleton />}>
           <Results params={params} stores={stores ?? []} categories={categories ?? []} />
         </Suspense>
+
+        {/* Reklama (nieaktywna do czasu podłączenia AdSense + zgody) */}
+        <AdSlot className="mt-10" />
+
+        {/* Linki SEO — przeglądanie wg sklepu i kategorii */}
+        <section className="mt-14 pt-8 border-t border-stone-100">
+          <h2 className="text-lg font-bold text-stone-800 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>
+            Przepisy według sklepu
+          </h2>
+          <div className="flex flex-wrap gap-2 mb-6">
+            {(stores ?? []).map((s) => (
+              <Link key={s.id} href={`/sklep/${s.slug}`} className="category-pill">{s.name}</Link>
+            ))}
+          </div>
+          <h2 className="text-lg font-bold text-stone-800 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>
+            Przepisy według kategorii
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {(categories ?? []).map((c) => (
+              <Link key={c.id} href={`/kategoria/${c.slug}`} className="category-pill">{c.icon} {c.name}</Link>
+            ))}
+          </div>
+        </section>
 
         {/* Ostatnio oglądane */}
         <RecentlyViewed />
