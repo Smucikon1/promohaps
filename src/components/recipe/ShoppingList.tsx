@@ -27,6 +27,9 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [], baseSe
     const promos = promoProducts.map((p) => ({
       id: p.id, name: p.name, amount: null, unit: null,
       isPromo: true, price: p.price_promo, priceRegular: p.price_regular, fixedPrice: true,
+      conditionType: p.condition_type ?? null,
+      conditionNote: p.condition_note ?? null,
+      minQuantity: p.min_quantity ?? null,
     }))
     const regular = ingredients.map((i) => ({
       id: i.id, name: i.name, amount: i.amount, unit: i.unit,
@@ -81,7 +84,19 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [], baseSe
           <span className="truncate">{item.name}</span>
         </span>
         {item.isPromo && (
-          <span className="text-[10px] uppercase tracking-wide text-amber-600 font-semibold">z gazetki</span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-amber-600 font-semibold">z gazetki</span>
+            {item.conditionType === 'karta' && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                tylko z kartą
+              </span>
+            )}
+            {item.conditionType === 'wielosztuka' && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                {item.minQuantity ? `przy ${item.minQuantity} szt.` : 'wielosztuka'}
+              </span>
+            )}
+          </span>
         )}
       </span>
 

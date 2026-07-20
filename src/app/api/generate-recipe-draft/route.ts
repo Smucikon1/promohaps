@@ -119,6 +119,9 @@ export async function POST(request: Request) {
         name: p.name,
         price_promo: p.price_promo,
         price_regular: p.price_regular ?? null,
+        condition_type: p.condition_type ?? 'brak',
+        condition_note: p.condition_note ?? null,
+        min_quantity: p.min_quantity ?? null,
         valid_from: today,
         valid_to: in14,
       }))

@@ -55,6 +55,8 @@ export interface Ingredient {
   is_promo_product: boolean
 }
 
+export type PromoConditionType = 'brak' | 'karta' | 'wielosztuka' | 'inny'
+
 export interface PromoProduct {
   id: string
   store_id: string
@@ -67,6 +69,10 @@ export interface PromoProduct {
   valid_to: string
   is_active?: boolean
   created_at: string
+  // Warunki promocji z gazetki (np. cena tylko z kartą, oferta 2+1)
+  condition_type?: PromoConditionType | null
+  condition_note?: string | null
+  min_quantity?: number | null
 }
 
 export interface RecipeStep {

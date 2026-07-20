@@ -6,10 +6,29 @@ import { createClient } from '@/lib/supabase/client'
 import { Loader2, ScanLine, Save, Sparkles, Trash2, ExternalLink } from 'lucide-react'
 import type { Store } from '@/types'
 
+type ConditionType = 'brak' | 'karta' | 'wielosztuka' | 'inny'
+
 interface Product {
   name: string
   price_promo: number | null
   price_regular: number | null
+  condition_type?: ConditionType
+  condition_note?: string | null
+  min_quantity?: number | null
+}
+
+const CONDITION_LABEL: Record<ConditionType, string> = {
+  brak: '',
+  karta: 'z kartą',
+  wielosztuka: 'wielosztuka',
+  inny: 'warunek',
+}
+
+const CONDITION_STYLE: Record<ConditionType, string> = {
+  brak: '',
+  karta: 'bg-purple-100 text-purple-700',
+  wielosztuka: 'bg-green-100 text-green-700',
+  inny: 'bg-stone-100 text-stone-600',
 }
 
 function readDataUrl(file: File): Promise<string> {
@@ -176,6 +195,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         name: p.name,
         price_promo: p.price_promo,
         price_regular: p.price_regular,
+        condition_type: p.condition_type ?? 'brak',
+        condition_note: p.condition_note ?? null,
+        min_quantity: p.min_quantity ?? null,
         valid_from: today,
         valid_to: in14,
         recipe_id: null,
@@ -267,6 +289,16 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
                     <td className="py-1.5 pr-3">
                       <input value={p.name} onChange={(e) => updateProduct(i, 'name', e.target.value)}
                         className="w-full px-2 py-1.5 border border-stone-200 rounded-lg" />
+                      {p.condition_type && p.condition_type !== 'brak' && (
+                        <span
+                          title={p.condition_note ?? ''}
+                          className={`inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${CONDITION_STYLE[p.condition_type]}`}
+                        >
+                          {CONDITION_LABEL[p.condition_type]}
+                          {p.min_quantity ? ` · min. ${p.min_quantity} szt.` : ''}
+                          {p.condition_note ? ` — ${p.condition_note}` : ''}
+                        </span>
+                      )}
                     </td>
                     <td className="py-1.5 px-2">
                       <input type="number" step="0.01" value={p.price_promo ?? ''} onChange={(e) => updateProduct(i, 'price_promo', e.target.value)}
