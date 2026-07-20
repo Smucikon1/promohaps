@@ -109,7 +109,17 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
   } as any)
 
   if (response.stop_reason === 'refusal') throw new Error('Model odmówił wygenerowania treści.')
-  return JSON.parse(firstText(response))
+  const recipe = JSON.parse(firstText(response))
+
+  // Cena całości liczona deterministycznie z cen składników — model bywa niespójny,
+  // a kafelek („Cena całości") i strona przepisu („Razem") muszą pokazywać to samo.
+  const sum = (recipe.ingredients ?? []).reduce(
+    (acc: number, i: any) => acc + (typeof i?.price === 'number' ? i.price : 0),
+    0
+  )
+  if (sum > 0) recipe.price_total = Math.round(sum * 100) / 100
+
+  return recipe
 }
 
 // ---------- Odczyt gazetki (wizja) ----------
