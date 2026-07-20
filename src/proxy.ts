@@ -50,7 +50,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // /api jest wyłączone celowo: trasy API autoryzują się same (supabase.auth.getUser()),
+  // a przepuszczanie ich przez middleware ucinało ciało żądania na 10 MB
+  // (duże PDF-y gazetek) — patrz middlewareClientMaxBodySize.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
