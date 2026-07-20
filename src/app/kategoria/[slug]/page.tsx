@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
+import { isPromoExpired } from '@/lib/utils'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -48,10 +49,13 @@ export default async function CategoryPage({ params }: Props) {
         .limit(48)
     : { data: [] as any[] }
 
-  const recipes = (rawRecipes ?? []).map((r: any) => ({
-    ...r,
-    categories: r.categories?.map((rc2: any) => rc2.category).filter(Boolean) ?? [],
-  }))
+  const recipes = (rawRecipes ?? [])
+    // Przepisy z wygasłą promocją znikają
+    .filter((r: any) => !(r.promo_products ?? []).some((p: any) => isPromoExpired(p.valid_to)))
+    .map((r: any) => ({
+      ...r,
+      categories: r.categories?.map((rc2: any) => rc2.category).filter(Boolean) ?? [],
+    }))
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">

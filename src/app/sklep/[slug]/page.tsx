@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { storeColor } from '@/lib/stores'
+import { isPromoExpired } from '@/lib/utils'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -44,10 +45,13 @@ export default async function StorePage({ params }: Props) {
     .order('created_at', { ascending: false })
     .limit(48)
 
-  const recipes = (rawRecipes ?? []).map((r: any) => ({
-    ...r,
-    categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
-  }))
+  const recipes = (rawRecipes ?? [])
+    // Przepisy z wygasłą promocją znikają
+    .filter((r: any) => !(r.promo_products ?? []).some((p: any) => isPromoExpired(p.valid_to)))
+    .map((r: any) => ({
+      ...r,
+      categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
+    }))
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">

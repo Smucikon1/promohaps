@@ -3,10 +3,9 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Clock, Users, Flame, ShoppingBag, PiggyBank, ArrowLeft } from 'lucide-react'
-import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive } from '@/lib/utils'
+import { Clock, Users, Flame, ShoppingBag, ArrowLeft } from 'lucide-react'
+import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, isPromoExpired, promoDaysLeft } from '@/lib/utils'
 import { storeColor } from '@/lib/stores'
-import { totalSavings } from '@/lib/savings'
 import { ShoppingList } from '@/components/recipe/ShoppingList'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeActions } from '@/components/recipe/RecipeActions'
@@ -52,6 +51,9 @@ export default async function RecipePage({ params }: Props) {
 
   if (!recipe) notFound()
 
+  // Wygasła choć jedna promocja => przepis znika ze strony (nieaktualne ceny)
+  if ((recipe.promo_products ?? []).some((p: any) => isPromoExpired(p.valid_to))) notFound()
+
   const normalized = {
     ...recipe,
     categories: recipe.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
@@ -61,14 +63,17 @@ export default async function RecipePage({ params }: Props) {
 
   const storeBg = storeColor(normalized.store?.slug)
   const activePromos = (normalized.promo_products ?? []).filter((p: any) => isPromoActive(p.valid_from, p.valid_to))
-  const savings = totalSavings(normalized.promo_products)
 
-  // Pilność promocji — ile dni do końca najbliżej wygasającej
-  const promoEnds = activePromos.map((p: any) => new Date(p.valid_to).getTime())
-  const soonest = promoEnds.length > 0 ? Math.min(...promoEnds) : null
-  const daysLeft = soonest != null ? Math.ceil((soonest - Date.now()) / (24 * 60 * 60 * 1000)) : null
+  // Ważność: najbliżej wygasająca promocja + wymóg karty lojalnościowej
+  const soonestTo = activePromos.length
+    ? activePromos.reduce((min: string, p: any) => (p.valid_to < min ? p.valid_to : min), activePromos[0].valid_to)
+    : null
+  const daysLeft = soonestTo ? promoDaysLeft(soonestTo) : null
   const urgencyLabel =
-    daysLeft == null ? null : daysLeft <= 0 ? 'kończy się dziś' : daysLeft === 1 ? 'kończy się jutro' : `kończy się za ${daysLeft} dni`
+    daysLeft == null
+      ? null
+      : daysLeft === 0 ? 'kończy się dziś' : daysLeft === 1 ? 'kończy się jutro' : `kończy się za ${daysLeft} dni`
+  const needsCard = activePromos.some((p: any) => p.condition_type === 'karta')
 
   // Dane do jadłospisu (składniki + promocje potrzebne do listy zakupów)
   const plannedRecipe = {
@@ -78,7 +83,7 @@ export default async function RecipePage({ params }: Props) {
     image_url: normalized.image_url,
     store_name: normalized.store?.name ?? null,
     price_total: normalized.price_total,
-    savings,
+    savings: 0,
     ingredients: normalized.ingredients.map((i: any) => ({
       id: i.id, name: i.name, amount: i.amount, unit: i.unit, price: i.price ?? null, isPromo: !!i.is_promo_product,
     })),
@@ -95,8 +100,11 @@ export default async function RecipePage({ params }: Props) {
     .eq('store_id', normalized.store_id)
     .neq('id', normalized.id)
     .order('created_at', { ascending: false })
-    .limit(3)
-  const related = relatedRaw ?? []
+    .limit(6)
+  // Powiązane też znikają, gdy mają wygasłą promocję
+  const related = (relatedRaw ?? [])
+    .filter((r: any) => !(r.promo_products ?? []).some((p: any) => isPromoExpired(p.valid_to)))
+    .slice(0, 3)
 
   const schemaOrg = {
     '@context': 'https://schema.org',
@@ -158,10 +166,9 @@ export default async function RecipePage({ params }: Props) {
                 <span className="store-badge" style={{ backgroundColor: storeBg }}>{normalized.store.name}</span>
               )}
             </div>
-            {savings > 0 && (
-              <div className="absolute top-4 right-4 inline-flex items-center gap-1 bg-green-600 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow">
-                <PiggyBank className="w-4 h-4" />
-                −{formatPrice(savings)}
+            {urgencyLabel && (
+              <div className="absolute top-4 right-4 bg-amber-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow">
+                🏷️ Promocja {urgencyLabel}
               </div>
             )}
             <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
@@ -201,9 +208,14 @@ export default async function RecipePage({ params }: Props) {
               store_name: normalized.store?.name ?? null,
             }}
           />
-          {urgencyLabel && (
+          {urgencyLabel && soonestTo && (
             <span className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">
-              ⏳ Promocja {urgencyLabel}
+              ⏳ Promocja {urgencyLabel} (do {new Date(soonestTo).toLocaleDateString('pl-PL', { day: 'numeric', month: 'numeric' })})
+            </span>
+          )}
+          {needsCard && (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-purple-700 bg-purple-50 px-3 py-1.5 rounded-full">
+              🪪 Część cen tylko z kartą sklepu
             </span>
           )}
         </div>
@@ -238,13 +250,6 @@ export default async function RecipePage({ params }: Props) {
               <ShoppingBag className="w-5 h-5 text-amber-500 mx-auto mb-1" />
               <div className="font-semibold text-stone-800">{formatPrice(normalized.price_total)}</div>
               <div className="text-xs text-stone-500">Koszt</div>
-            </div>
-          )}
-          {savings > 0 && (
-            <div className="flex-1 min-w-[90px] px-4 text-center">
-              <PiggyBank className="w-5 h-5 text-green-600 mx-auto mb-1" />
-              <div className="font-bold text-green-600">{formatPrice(savings)}</div>
-              <div className="text-xs text-stone-500">Oszczędzasz</div>
             </div>
           )}
         </div>

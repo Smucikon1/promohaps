@@ -3,6 +3,7 @@ import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeFilters } from '@/components/recipe/RecipeFilters'
 import { SearchBar } from '@/components/recipe/SearchBar'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
+import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { AdSlot } from '@/components/ads/AdSlot'
 import Link from 'next/link'
 import { Suspense } from 'react'
@@ -36,6 +37,8 @@ function GridSkeleton() {
 
 async function Results({ params, stores, categories }: { params: SearchParams; stores: Store[]; categories: Category[] }) {
   const supabase = await createClient()
+  // Przepisy z wygasłymi promocjami znikają z listy
+  const hidden = await expiredRecipeIds(supabase)
 
   const parsedLimit = parseInt(params.limit ?? '', 10)
   const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 120) : PAGE_SIZE
@@ -50,6 +53,8 @@ async function Results({ params, stores, categories }: { params: SearchParams; s
       { count: 'exact' }
     )
     .eq('is_published', true)
+
+  if (hidden.length > 0) query = query.not('id', 'in', `(${hidden.join(',')})`)
 
   if (sort === 'cheap') query = query.order('price_total', { ascending: true, nullsFirst: false })
   else if (sort === 'fast') query = query.order('prep_time_min', { ascending: true, nullsFirst: false })

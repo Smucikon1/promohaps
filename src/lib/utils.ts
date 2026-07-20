@@ -39,9 +39,32 @@ export function difficultyColor(d: string | null): string {
   return d ? (map[d] ?? '') : ''
 }
 
+// Promocja obowiązuje do KOŃCA dnia valid_to
+function promoEnd(validTo: string): Date {
+  const end = new Date(validTo)
+  end.setHours(23, 59, 59, 999)
+  return end
+}
+
 export function isPromoActive(validFrom: string, validTo: string): boolean {
   const now = new Date()
-  return new Date(validFrom) <= now && new Date(validTo) >= now
+  return new Date(validFrom) <= now && promoEnd(validTo) >= now
+}
+
+export function isPromoExpired(validTo: string): boolean {
+  return promoEnd(validTo) < new Date()
+}
+
+// Pełne dni do końca promocji: 0 = ostatni dzień, 1 = do jutra itd.
+export function promoDaysLeft(validTo: string): number {
+  return Math.max(0, Math.floor((promoEnd(validTo).getTime() - Date.now()) / 86_400_000))
+}
+
+export function promoDaysLeftLabel(validTo: string): string {
+  const d = promoDaysLeft(validTo)
+  if (d === 0) return 'ostatni dzień'
+  if (d === 1) return 'kończy się jutro'
+  return `jeszcze ${d} dni`
 }
 
 // Skaluje ilość składnika (best-effort). Obsługuje liczby ("200", "1,5") i ułamki ("1/2").

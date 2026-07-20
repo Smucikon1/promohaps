@@ -107,9 +107,9 @@ export async function POST(request: Request) {
     )
   }
 
-  // Produkty z gazetki (domyślne daty ważności)
+  // Produkty z gazetki — daty ważności z gazetki, fallback: dziś + 7 dni
   const today = new Date().toISOString().slice(0, 10)
-  const in14 = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const in7 = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const promos = (recipe.promos ?? []).filter((p: any) => p?.name && p?.price_promo != null)
   if (promos.length > 0) {
     await supabase.from('promo_products').insert(
@@ -122,8 +122,8 @@ export async function POST(request: Request) {
         condition_type: p.condition_type ?? 'brak',
         condition_note: p.condition_note ?? null,
         min_quantity: p.min_quantity ?? null,
-        valid_from: today,
-        valid_to: in14,
+        valid_from: p.valid_from ?? today,
+        valid_to: p.valid_to ?? in7,
       }))
     )
   }

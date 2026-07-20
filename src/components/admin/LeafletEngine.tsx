@@ -15,6 +15,9 @@ interface Product {
   condition_type?: ConditionType
   condition_note?: string | null
   min_quantity?: number | null
+  // Okres ważności odczytany z gazetki (YYYY-MM-DD) lub null
+  valid_from?: string | null
+  valid_to?: string | null
 }
 
 const CONDITION_LABEL: Record<ConditionType, string> = {
@@ -102,6 +105,8 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const [extracting, setExtracting] = useState(false)
   const [progress, setProgress] = useState('')
   const [products, setProducts] = useState<Product[]>([])
+  const [validFrom, setValidFrom] = useState('')
+  const [validTo, setValidTo] = useState('')
   const [error, setError] = useState('')
   const [savedMsg, setSavedMsg] = useState('')
 
@@ -163,6 +168,17 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         setProducts([...merged]) // pokazuj wyniki na bieżąco
       }
 
+      // Prefill okresu ważności z odczytanych dat (najczęstsza wartość)
+      const mode = (vals: string[]) => {
+        const c = new Map<string, number>()
+        vals.forEach((v) => c.set(v, (c.get(v) ?? 0) + 1))
+        return [...c.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+      }
+      const froms = merged.map((p) => p.valid_from).filter(Boolean) as string[]
+      const tos = merged.map((p) => p.valid_to).filter(Boolean) as string[]
+      if (froms.length) setValidFrom(mode(froms))
+      if (tos.length) setValidTo(mode(tos))
+
       if (merged.length === 0) setError('Nie znaleziono produktów spożywczych w tej gazetce.')
     } catch (err: any) {
       setError(`Błąd: ${err?.message ?? 'nieznany'}`)
@@ -181,14 +197,22 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     })
   }
 
+  // Daty produktu: własne z gazetki -> globalne z formularza -> rozsądny domyślny zakres
+  const resolveDates = (p: Product) => {
+    const today = new Date().toISOString().slice(0, 10)
+    const in7 = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    return {
+      valid_from: p.valid_from || validFrom || today,
+      valid_to: p.valid_to || validTo || in7,
+    }
+  }
+
   const savePromos = async () => {
     setError('')
     setSavedMsg('')
     const valid = products.filter((p) => p.name && p.price_promo != null)
     if (!store || valid.length === 0) { setError('Brak produktów do zapisu.'); return }
     const supabase = createClient()
-    const today = new Date().toISOString().slice(0, 10)
-    const in14 = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
     const { error: insErr } = await supabase.from('promo_products').insert(
       valid.map((p) => ({
         store_id: store.id,
@@ -198,8 +222,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         condition_type: p.condition_type ?? 'brak',
         condition_note: p.condition_note ?? null,
         min_quantity: p.min_quantity ?? null,
-        valid_from: today,
-        valid_to: in14,
+        ...resolveDates(p),
         recipe_id: null,
       }))
     )
@@ -218,7 +241,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
           storeSlug,
           storeName: store?.name ?? '',
           theme,
-          promoProducts: products.filter((p) => p.name && p.price_promo != null),
+          promoProducts: products
+            .filter((p) => p.name && p.price_promo != null)
+            .map((p) => ({ ...p, ...resolveDates(p) })),
         }),
       })
       const data = await res.json()
@@ -277,6 +302,25 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">2</span>
             <h2 className="font-bold text-stone-800">Sprawdź i zapisz promocje ({products.length})</h2>
+          </div>
+
+          {/* Okres ważności promocji (prefill z gazetki, można poprawić) */}
+          <div className="flex flex-wrap items-end gap-3 bg-stone-50 rounded-xl p-3">
+            <div>
+              <label htmlFor="le-from" className="block text-xs font-medium text-stone-500 mb-1">Ważne od</label>
+              <input id="le-from" type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)}
+                className="px-2.5 py-1.5 border border-stone-200 rounded-lg text-sm bg-white" />
+            </div>
+            <div>
+              <label htmlFor="le-to" className="block text-xs font-medium text-stone-500 mb-1">Ważne do</label>
+              <input id="le-to" type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)}
+                className="px-2.5 py-1.5 border border-stone-200 rounded-lg text-sm bg-white" />
+            </div>
+            <p className="text-xs text-stone-400 pb-1.5 flex-1 min-w-[200px]">
+              {validFrom || validTo
+                ? 'Odczytane z gazetki — sprawdź przed zapisem. Po dacie „do" przepisy z tymi produktami znikną ze strony.'
+                : 'Gazetka nie podała dat — ustaw ręcznie (domyślnie 7 dni od dziś).'}
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

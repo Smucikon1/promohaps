@@ -6,7 +6,6 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { CalendarDays, ArrowLeft, X, ShoppingCart, Trash2, Plus } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
-import { ProgressRing } from '@/components/ui/ProgressRing'
 import {
   DAYS,
   readPlan,
@@ -90,20 +89,14 @@ export default function PlanPage() {
         <>
           {/* Podsumowanie tygodnia */}
           <div className="bg-white rounded-2xl border border-stone-100 p-5 mb-8">
-            <div className="flex items-center gap-5 mb-5">
-              <ProgressRing value={totals.savings} max={totals.cost + totals.savings} color="#10b981">
-                <span className="text-base font-bold text-green-600">{formatPrice(totals.savings)}</span>
-                <span className="text-[10px] text-stone-400">oszczędności</span>
-              </ProgressRing>
-              <div className="flex-1 grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xl font-bold text-stone-800">{totals.meals}</div>
-                  <div className="text-xs text-stone-500">Posiłków</div>
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-stone-800">{formatPrice(totals.cost)}</div>
-                  <div className="text-xs text-stone-500">Koszt tygodnia</div>
-                </div>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div>
+                <div className="text-2xl font-bold text-stone-800">{totals.meals}</div>
+                <div className="text-xs text-stone-500">Posiłków</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-stone-800">{formatPrice(totals.cost)}</div>
+                <div className="text-xs text-stone-500">Koszt tygodnia</div>
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -161,7 +154,7 @@ export default function PlanPage() {
                               <p className="text-sm font-medium text-stone-700 truncate group-hover:text-amber-600 transition-colors">{r.title}</p>
                               <div className="flex items-center gap-2 text-xs">
                                 {r.store_name && <span className="text-stone-400">{r.store_name}</span>}
-                                {r.savings > 0 && <span className="text-green-600 font-semibold">−{formatPrice(r.savings)}</span>}
+                                {r.price_total != null && <span className="text-amber-600 font-semibold">{formatPrice(r.price_total)}</span>}
                               </div>
                             </div>
                           </Link>

@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Clock, Users, Flame } from 'lucide-react'
-import { formatPrice, formatTime, difficultyLabel, cn } from '@/lib/utils'
+import { formatPrice, formatTime, difficultyLabel, promoDaysLeftLabel, cn } from '@/lib/utils'
 import { storeColor } from '@/lib/stores'
-import { activePromos, totalSavings } from '@/lib/savings'
+import { activePromos } from '@/lib/savings'
 import { FavoriteButton } from '@/components/recipe/FavoriteButton'
 import type { Recipe } from '@/types'
 import { track } from '@/lib/analytics'
@@ -18,7 +18,11 @@ interface RecipeCardProps {
 export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
   const promos = activePromos(recipe.promo_products)
   const hasActivePromo = promos.length > 0
-  const savings = totalSavings(recipe.promo_products)
+  // Najbliższy koniec promocji + wymóg karty lojalnościowej
+  const nearestEnd = hasActivePromo
+    ? promos.reduce((min, p) => (p.valid_to < min ? p.valid_to : min), promos[0].valid_to)
+    : null
+  const needsCard = promos.some((p) => p.condition_type === 'karta')
 
   return (
     <div className={cn('recipe-card group relative animate-fade-in-up', `stagger-${(index % 4) + 1}`)}>
@@ -67,16 +71,19 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
             </div>
           )}
 
-          {/* Odznaka wartości */}
-          {savings > 0 ? (
-            <div className="absolute bottom-3 left-3 bg-green-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
-              Oszczędzasz −{formatPrice(savings)}
+          {/* Ważność promocji + warunek karty */}
+          {hasActivePromo && nearestEnd && (
+            <div className="absolute bottom-3 left-3 flex flex-wrap items-center gap-1.5">
+              <div className="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
+                🏷️ {promoDaysLeftLabel(nearestEnd)}
+              </div>
+              {needsCard && (
+                <div className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm">
+                  z kartą
+                </div>
+              )}
             </div>
-          ) : hasActivePromo ? (
-            <div className="absolute bottom-3 left-3 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-              🏷️ Promocja
-            </div>
-          ) : null}
+          )}
         </div>
 
         {/* Treść */}
