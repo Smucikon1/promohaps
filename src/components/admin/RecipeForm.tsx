@@ -44,7 +44,7 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>(seed?.category_ids ?? [])
   const [prepTime, setPrepTime] = useState(seed?.prep_time_min?.toString() ?? '')
   const [difficulty, setDifficulty] = useState(seed?.difficulty ?? 'latwy')
-  const [servings, setServings] = useState(seed?.servings?.toString() ?? '4')
+  const [servings] = useState(seed?.servings?.toString() ?? '4')
   const [priceTotal, setPriceTotal] = useState(seed?.price_total?.toString() ?? '')
   const [isPublished, setIsPublished] = useState(seed?.is_published ?? false)
   const [metaTitle, setMetaTitle] = useState(seed?.meta_title ?? '')
@@ -282,10 +282,6 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
           <div>
             <label htmlFor="rf-prep" className={labelClass}>Czas (min)</label>
             <input id="rf-prep" className={inputClass} type="number" min="0" value={prepTime} onChange={(e) => setPrepTime(e.target.value)} placeholder="30" />
-          </div>
-          <div>
-            <label htmlFor="rf-servings" className={labelClass}>Porcje</label>
-            <input id="rf-servings" className={inputClass} type="number" min="1" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="4" />
           </div>
           <div>
             <label htmlFor="rf-price" className={labelClass}>Cena (PLN)</label>

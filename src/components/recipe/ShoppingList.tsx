@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { ShoppingCart, RotateCcw, Check, Tag, Minus, Plus } from 'lucide-react'
-import { cn, formatPrice, scaleAmount } from '@/lib/utils'
+import { useEffect, useMemo } from 'react'
+import { ShoppingCart, RotateCcw, Check, Tag, Plus } from 'lucide-react'
+import { cn, formatPrice } from '@/lib/utils'
 import { useShoppingList } from '@/hooks/useShoppingList'
 import type { ShoppingItem } from '@/lib/shopping'
 import type { Ingredient, PromoProduct } from '@/types'
@@ -11,16 +11,11 @@ interface ShoppingListProps {
   recipeId: string
   ingredients: Ingredient[]
   promoProducts?: PromoProduct[]
-  baseServings?: number | null
 }
 
-export function ShoppingList({ recipeId, ingredients, promoProducts = [], baseServings }: ShoppingListProps) {
+export function ShoppingList({ recipeId, ingredients, promoProducts = [] }: ShoppingListProps) {
   const { items, loaded, exists, addAll, removeAll, syncMeta, toggleItem, resetList, checkedCount } =
     useShoppingList(recipeId)
-
-  const base = baseServings && baseServings > 0 ? baseServings : null
-  const [servings, setServings] = useState(base ?? 1)
-  const factor = base ? servings / base : 1
 
   // Definicja składników: produkty z gazetki (wyróżnione) + zwykłe składniki
   const defs = useMemo<Omit<ShoppingItem, 'checked'>[]>(() => {
@@ -66,10 +61,7 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [], baseSe
   const rows: ShoppingItem[] = exists ? items : defs.map((d) => ({ ...d, checked: false }))
   const total = rows.length
   const progress = exists && total > 0 ? (checkedCount / total) * 100 : 0
-  const totalPrice = rows.reduce(
-    (sum, it) => sum + (it.price != null ? (it.fixedPrice ? it.price : it.price * factor) : 0),
-    0
-  )
+  const totalPrice = rows.reduce((sum, it) => sum + (it.price != null ? it.price : 0), 0)
 
   const rowContent = (item: ShoppingItem) => (
     <>
@@ -102,11 +94,11 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [], baseSe
 
       <span className="text-right flex-shrink-0 leading-tight">
         {(item.amount || item.unit) && (
-          <span className="block text-xs text-stone-500">{scaleAmount(item.amount, factor)} {item.unit}</span>
+          <span className="block text-xs text-stone-500">{item.amount} {item.unit}</span>
         )}
         {item.price != null && (
           <span className={cn('block text-sm font-semibold', item.isPromo ? 'text-amber-600' : 'text-stone-700')}>
-            {formatPrice(item.fixedPrice ? item.price : item.price * factor)}
+            {formatPrice(item.price)}
           </span>
         )}
         {item.priceRegular != null && (
@@ -156,32 +148,6 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [], baseSe
             </button>
           </div>
         )
-      )}
-
-      {/* Krok porcji */}
-      {base && (
-        <div className="px-5 py-2.5 border-b border-stone-50 flex items-center justify-between">
-          <span className="text-xs text-stone-500">Porcje</span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setServings((s) => Math.max(1, s - 1))}
-              disabled={servings <= 1}
-              aria-label="Zmniejsz liczbę porcji"
-              className="w-7 h-7 rounded-full border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 disabled:opacity-40 transition-colors"
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-            <span className="w-6 text-center font-semibold text-stone-800" aria-live="polite">{servings}</span>
-            <button
-              onClick={() => setServings((s) => Math.min(30, s + 1))}
-              disabled={servings >= 30}
-              aria-label="Zwiększ liczbę porcji"
-              className="w-7 h-7 rounded-full border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 disabled:opacity-40 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
       )}
 
       {/* Pasek postępu (tylko gdy na liście) */}

@@ -250,5 +250,8 @@ export async function extractLeafletProducts(input: ExtractLeafletInput): Promis
 
   if (response.stop_reason === 'refusal') throw new Error('Model odmówił odczytu.')
   const parsed = JSON.parse(firstText(response))
-  return Array.isArray(parsed.products) ? parsed.products : []
+  const all = Array.isArray(parsed.products) ? parsed.products : []
+  // Bierzemy tylko promocje CENOWE (zwykłą obniżkę, także „z kartą").
+  // Odrzucamy wielosztuki/„2+1"/„3 za 2" i inne warunki złożone.
+  return all.filter((p: any) => p.condition_type === 'brak' || p.condition_type === 'karta')
 }

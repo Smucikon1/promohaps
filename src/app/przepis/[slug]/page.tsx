@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Clock, Users, Flame, ShoppingBag, ArrowLeft } from 'lucide-react'
+import { Clock, Flame, ShoppingBag, ArrowLeft } from 'lucide-react'
 import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, isPromoExpired, promoDaysLeft } from '@/lib/utils'
 import { storeColor } from '@/lib/stores'
 import { ShoppingList } from '@/components/recipe/ShoppingList'
@@ -229,13 +229,6 @@ export default async function RecipePage({ params }: Props) {
               <div className="text-xs text-stone-500">Czas</div>
             </div>
           )}
-          {normalized.servings && (
-            <div className="flex-1 min-w-[80px] px-4 text-center">
-              <Users className="w-5 h-5 text-amber-500 mx-auto mb-1" />
-              <div className="font-semibold text-stone-800">{normalized.servings}</div>
-              <div className="text-xs text-stone-500">Porcje</div>
-            </div>
-          )}
           {normalized.difficulty && (
             <div className="flex-1 min-w-[80px] px-4 text-center">
               <Flame className="w-5 h-5 text-amber-500 mx-auto mb-1" />
@@ -264,7 +257,6 @@ export default async function RecipePage({ params }: Props) {
               recipeId={normalized.id}
               ingredients={normalized.ingredients}
               promoProducts={activePromos}
-              baseServings={normalized.servings}
             />
           </div>
 

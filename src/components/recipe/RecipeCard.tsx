@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Clock, Users, Flame } from 'lucide-react'
+import { Clock, Flame } from 'lucide-react'
 import { formatPrice, formatTime, difficultyLabel, promoDaysLeftLabel, cn } from '@/lib/utils'
 import { storeColor } from '@/lib/stores'
 import { activePromos } from '@/lib/savings'
@@ -112,12 +112,6 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
                 {formatTime(recipe.prep_time_min)}
-              </span>
-            )}
-            {recipe.servings && (
-              <span className="flex items-center gap-1">
-                <Users className="w-3.5 h-3.5" />
-                {recipe.servings} os.
               </span>
             )}
             {recipe.difficulty && (
