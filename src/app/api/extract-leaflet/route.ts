@@ -17,14 +17,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Nieprawidłowe dane.' }, { status: 400 })
   }
 
-  const base64: string = body.base64 ?? ''
-  const mediaType: string = body.mediaType ?? 'image/jpeg'
-  if (!base64) return NextResponse.json({ error: 'Brak pliku.' }, { status: 400 })
+  // Klient wysyła partię stron (PDF rozłożony na obrazy) albo pojedynczy obraz
+  const images: { base64: string; mediaType: string }[] = Array.isArray(body.images)
+    ? body.images.filter((i: any) => i?.base64)
+    : body.base64
+      ? [{ base64: body.base64, mediaType: body.mediaType ?? 'image/jpeg' }]
+      : []
+
+  if (images.length === 0) return NextResponse.json({ error: 'Brak pliku.' }, { status: 400 })
 
   try {
     const products = await extractLeafletProducts({
-      base64,
-      mediaType,
+      images,
       storeName: body.storeName ?? '',
     })
     return NextResponse.json({ products })

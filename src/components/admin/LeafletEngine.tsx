@@ -21,15 +21,18 @@ function readDataUrl(file: File): Promise<string> {
   })
 }
 
-// Zwraca czysty base64 (bez prefiksu data:). PDF — natywnie; obraz — zmniejszony do ~1600px.
-async function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }> {
-  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+type PageImage = { base64: string; mediaType: string }
 
-  if (isPdf) {
-    const dataUrl = await readDataUrl(file)
-    return { base64: dataUrl.split(',')[1] ?? '', mediaType: 'application/pdf' }
-  }
+const MAX_EDGE = 1600 // dłuższy bok strony/obrazu po przeskalowaniu
+const PAGES_PER_REQUEST = 3 // partia stron na jedno wywołanie API
 
+function canvasToBase64(canvas: HTMLCanvasElement): PageImage {
+  const out = canvas.toDataURL('image/jpeg', 0.85)
+  return { base64: out.split(',')[1], mediaType: 'image/jpeg' }
+}
+
+// Pojedynczy obraz -> zmniejszony JPEG
+async function imageToPage(file: File): Promise<PageImage> {
   const dataUrl = await readDataUrl(file)
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image()
@@ -37,19 +40,48 @@ async function fileToBase64(file: File): Promise<{ base64: string; mediaType: st
     i.onerror = () => reject(new Error('Nie udało się wczytać obrazu.'))
     i.src = dataUrl
   })
-  const max = 1600
-  const scale = Math.min(1, max / Math.max(img.width, img.height))
+  const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height))
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(img.width * scale)
   canvas.height = Math.round(img.height * scale)
   canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-  const out = canvas.toDataURL('image/jpeg', 0.85)
-  return { base64: out.split(',')[1], mediaType: 'image/jpeg' }
+  return canvasToBase64(canvas)
+}
+
+// PDF -> każda strona zrenderowana do JPEG (omija limit rozmiaru żądania)
+async function pdfToPages(file: File, onProgress: (done: number, total: number) => void): Promise<PageImage[]> {
+  const pdfjs: any = await import('pdfjs-dist')
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url
+  ).toString()
+
+  const buf = await file.arrayBuffer()
+  const doc = await pdfjs.getDocument({ data: buf }).promise
+  const pages: PageImage[] = []
+
+  for (let n = 1; n <= doc.numPages; n++) {
+    const page = await doc.getPage(n)
+    const base = page.getViewport({ scale: 1 })
+    const scale = Math.min(2, MAX_EDGE / Math.max(base.width, base.height))
+    const viewport = page.getViewport({ scale })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(viewport.width)
+    canvas.height = Math.round(viewport.height)
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    await page.render({ canvas, canvasContext: ctx, viewport }).promise
+    pages.push(canvasToBase64(canvas))
+    onProgress(n, doc.numPages)
+  }
+  return pages
 }
 
 export function LeafletEngine({ stores }: { stores: Store[] }) {
   const [storeSlug, setStoreSlug] = useState(stores[0]?.slug ?? '')
   const [extracting, setExtracting] = useState(false)
+  const [progress, setProgress] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [error, setError] = useState('')
   const [savedMsg, setSavedMsg] = useState('')
@@ -63,29 +95,61 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    // Limit: base64 nie może przekroczyć limitu żądania Claude (~32 MB)
-    if (file.size > 20 * 1024 * 1024) {
-      setError('Plik za duży (maks. 20 MB). Podziel gazetkę na pojedyncze strony lub zmniejsz PDF.')
+    if (file.size > 100 * 1024 * 1024) {
+      setError('Plik za duży (maks. 100 MB).')
       e.target.value = ''
       return
     }
+
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
     setExtracting(true)
     setError('')
     setSavedMsg('')
+    setProducts([])
+
     try {
-      const { base64, mediaType } = await fileToBase64(file)
-      const res = await fetch('/api/extract-leaflet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64, mediaType, storeName: store?.name ?? '' }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Nie udało się odczytać gazetki.'); return }
-      setProducts(data.products ?? [])
+      // 1) Przygotowanie stron (PDF rozkładamy na obrazy w przeglądarce)
+      let pages: PageImage[]
+      if (isPdf) {
+        setProgress('Wczytuję PDF...')
+        pages = await pdfToPages(file, (done, total) => setProgress(`Renderuję strony: ${done}/${total}`))
+      } else {
+        pages = [await imageToPage(file)]
+      }
+      if (pages.length === 0) throw new Error('PDF nie zawiera stron.')
+
+      // 2) Wysyłka partiami — omija limit rozmiaru żądania
+      const merged: Product[] = []
+      const seen = new Set<string>()
+      const batches = Math.ceil(pages.length / PAGES_PER_REQUEST)
+
+      for (let b = 0; b < batches; b++) {
+        const slice = pages.slice(b * PAGES_PER_REQUEST, (b + 1) * PAGES_PER_REQUEST)
+        setProgress(`Odczytuję promocje: partia ${b + 1}/${batches} (${pages.length} stron)`)
+
+        const res = await fetch('/api/extract-leaflet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images: slice, storeName: store?.name ?? '' }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? 'Nie udało się odczytać gazetki.')
+
+        for (const p of data.products ?? []) {
+          const key = String(p.name ?? '').trim().toLowerCase()
+          if (!key || seen.has(key)) continue
+          seen.add(key)
+          merged.push(p)
+        }
+        setProducts([...merged]) // pokazuj wyniki na bieżąco
+      }
+
+      if (merged.length === 0) setError('Nie znaleziono produktów spożywczych w tej gazetce.')
     } catch (err: any) {
       setError(`Błąd: ${err?.message ?? 'nieznany'}`)
     } finally {
       setExtracting(false)
+      setProgress('')
       e.target.value = ''
     }
   }
@@ -171,7 +235,16 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
             <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onFile} disabled={extracting} />
           </label>
         </div>
-        <p className="text-xs text-stone-400">Claude odczyta produkty spożywcze i ceny. Duże zdjęcia są automatycznie zmniejszane.</p>
+        {progress ? (
+          <p className="text-xs text-amber-700 font-medium flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            {progress}
+          </p>
+        ) : (
+          <p className="text-xs text-stone-400">
+            Claude odczyta produkty spożywcze i ceny. Wielostronicowy PDF jest automatycznie dzielony na strony i analizowany partiami.
+          </p>
+        )}
       </div>
 
       {error && <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}

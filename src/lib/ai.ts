@@ -124,14 +124,19 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
 
 // ---------- Odczyt gazetki (wizja) ----------
 
-export interface ExtractLeafletInput {
+export interface LeafletImage {
   base64: string
-  mediaType: string // image/png | image/jpeg | image/webp | application/pdf
+  mediaType: string // image/jpeg | image/png | image/webp
+}
+
+export interface ExtractLeafletInput {
+  images: LeafletImage[]
   storeName?: string
 }
 
 export async function extractLeafletProducts(input: ExtractLeafletInput): Promise<any[]> {
-  const { base64, mediaType, storeName = '' } = input
+  const { images, storeName = '' } = input
+  if (!images?.length) return []
 
   const schema = {
     type: 'object',
@@ -154,24 +159,27 @@ export async function extractLeafletProducts(input: ExtractLeafletInput): Promis
     additionalProperties: false,
   }
 
-  const isPdf = mediaType === 'application/pdf'
-  const mediaBlock = isPdf
-    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
-    : { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } }
+  const mediaBlocks = images.map((img) => ({
+    type: 'image',
+    source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+  }))
 
+  const many = images.length > 1
   const instruction = [
-    `Z załączonej strony gazetki promocyjnej${storeName ? ` sklepu ${storeName}` : ''} wypisz produkty spożywcze`,
-    'wraz z ceną promocyjną (price_promo) i — jeśli widoczna — ceną regularną (price_regular, inaczej null).',
+    `Z załączonych ${many ? `${images.length} stron` : 'strony'} gazetki promocyjnej${storeName ? ` sklepu ${storeName}` : ''}`,
+    'wypisz WSZYSTKIE produkty spożywcze wraz z ceną promocyjną (price_promo)',
+    'i — jeśli widoczna — ceną regularną (price_regular, inaczej null).',
     'Ignoruj produkty niespożywcze (chemia, AGD itp.) i reklamy. Ceny podawaj jako liczby w PLN.',
     'Nazwy skróć do rozpoznawalnej nazwy produktu (np. „Filet z kurczaka 1kg").',
-  ].join(' ')
+    many ? 'Nie pomijaj żadnej strony i nie duplikuj tego samego produktu.' : '',
+  ].filter(Boolean).join(' ')
 
   const response = await client().messages.create({
     model: 'claude-opus-4-8',
     max_tokens: 16000,
     thinking: { type: 'adaptive' },
     output_config: { format: { type: 'json_schema', schema } },
-    messages: [{ role: 'user', content: [mediaBlock, { type: 'text', text: instruction }] }],
+    messages: [{ role: 'user', content: [...mediaBlocks, { type: 'text', text: instruction }] }],
   } as any)
 
   if (response.stop_reason === 'refusal') throw new Error('Model odmówił odczytu.')
