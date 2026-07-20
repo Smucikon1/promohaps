@@ -17,9 +17,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Nieprawidłowe dane.' }, { status: 400 })
   }
 
-  const [{ data: stores }, { data: categories }] = await Promise.all([
+  const [{ data: stores }, { data: categories }, { data: existing }] = await Promise.all([
     supabase.from('stores').select('id, slug, name').eq('is_active', true),
     supabase.from('categories').select('id, slug').eq('is_active', true),
+    // Tytuły ostatnich przepisów — model ma ich nie powtarzać
+    supabase.from('recipes').select('title').order('created_at', { ascending: false }).limit(40),
   ])
 
   let recipe: any
@@ -30,6 +32,8 @@ export async function POST(request: Request) {
       theme: (body.theme ?? '').toString().slice(0, 300),
       categorySlugs: (categories ?? []).map((c: any) => c.slug),
       promoProducts: Array.isArray(body.promoProducts) ? body.promoProducts : [],
+      avoidTitles: (existing ?? []).map((r: any) => r.title).filter(Boolean),
+      reuseProducts: Array.isArray(body.reuseProducts) ? body.reuseProducts : [],
     })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Błąd generowania.' }, { status: 500 })
@@ -45,8 +49,8 @@ export async function POST(request: Request) {
 
   // Unikalny slug (na wypadek kolizji)
   let slug = (recipe.slug || 'przepis').toString()
-  const { data: existing } = await supabase.from('recipes').select('id').eq('slug', slug).maybeSingle()
-  if (existing) slug = `${slug}-${Date.now().toString(36).slice(-4)}`
+  const { data: slugTaken } = await supabase.from('recipes').select('id').eq('slug', slug).maybeSingle()
+  if (slugTaken) slug = `${slug}-${Date.now().toString(36).slice(-4)}`
 
   const payload = {
     title: recipe.title ?? 'Bez tytułu',
@@ -128,5 +132,11 @@ export async function POST(request: Request) {
     )
   }
 
-  return NextResponse.json({ recipeId, title: payload.title, editUrl: `/admin/przepisy/${recipeId}` })
+  return NextResponse.json({
+    recipeId,
+    title: payload.title,
+    editUrl: `/admin/przepisy/${recipeId}`,
+    // Produkty użyte w tym przepisie — kolejne przepisy mogą je współdzielić
+    usedProducts: promos.map((p: any) => p.name).filter(Boolean),
+  })
 }

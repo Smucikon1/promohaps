@@ -12,6 +12,7 @@ import {
   removeFromDay,
   clearPlan,
   planTotals,
+  sharedProducts,
   planToShoppingItems,
   MEAL_PLAN_EVENT,
   type MealPlan,
@@ -40,6 +41,7 @@ export default function PlanPage() {
   if (!loaded) return null
 
   const totals = planTotals(plan)
+  const shared = sharedProducts(plan)
   const isEmpty = totals.meals === 0
 
   const generateList = () => {
@@ -99,6 +101,22 @@ export default function PlanPage() {
                 <div className="text-xs text-stone-500">Koszt tygodnia</div>
               </div>
             </div>
+            {/* Produkty wykorzystane w kilku przepisach */}
+            {shared.length > 0 && (
+              <div className="bg-green-50 rounded-xl p-3 mb-5">
+                <p className="text-xs font-semibold text-green-800 mb-2">
+                  ♻️ Kupujesz raz, gotujesz kilka razy — {shared.length} wspólnych produktów
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {shared.slice(0, 10).map((s) => (
+                    <span key={s.name} className="text-xs bg-white text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
+                      {s.name} <span className="font-bold">×{s.count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-3">
               <button onClick={generateList} className="btn-primary flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" />

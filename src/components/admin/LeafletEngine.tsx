@@ -113,6 +113,8 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const [theme, setTheme] = useState('')
   const [generating, setGenerating] = useState(false)
   const [drafts, setDrafts] = useState<{ id: string; title: string; editUrl: string }[]>([])
+  // Produkty użyte w dotychczas wygenerowanych przepisach (współdzielenie zakupów)
+  const [usedProducts, setUsedProducts] = useState<string[]>([])
 
   const store = stores.find((s) => s.slug === storeSlug)
 
@@ -244,11 +246,14 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
           promoProducts: products
             .filter((p) => p.name && p.price_promo != null)
             .map((p) => ({ ...p, ...resolveDates(p) })),
+          // Produkty z wcześniej wygenerowanych przepisów — jedno opakowanie na kilka dań
+          reuseProducts: usedProducts,
         }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Nie udało się wygenerować szkicu.'); return }
       setDrafts((d) => [{ id: data.recipeId, title: data.title, editUrl: data.editUrl }, ...d])
+      setUsedProducts((prev) => Array.from(new Set([...prev, ...(data.usedProducts ?? [])])))
     } catch (err: any) {
       setError(`Błąd: ${err?.message ?? 'nieznany'}`)
     } finally {

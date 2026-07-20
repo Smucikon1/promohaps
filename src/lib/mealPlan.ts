@@ -81,6 +81,32 @@ export function countPlanned(plan?: MealPlan): number {
   return Object.values(p).reduce((n, list) => n + list.length, 0)
 }
 
+// Produkty występujące w więcej niż jednym przepisie — kupujesz raz, gotujesz kilka dań
+export function sharedProducts(plan?: MealPlan): { name: string; count: number }[] {
+  const p = plan ?? readPlan()
+  const counts = new Map<string, { name: string; recipes: Set<string> }>()
+
+  for (const list of Object.values(p)) {
+    for (const r of list) {
+      const names = [
+        ...r.ingredients.map((i) => i.name),
+        ...r.promos.map((pr) => pr.name),
+      ]
+      for (const raw of names) {
+        const key = String(raw ?? '').trim().toLowerCase()
+        if (!key) continue
+        if (!counts.has(key)) counts.set(key, { name: raw, recipes: new Set() })
+        counts.get(key)!.recipes.add(r.id)
+      }
+    }
+  }
+
+  return [...counts.values()]
+    .filter((v) => v.recipes.size > 1)
+    .map((v) => ({ name: v.name, count: v.recipes.size }))
+    .sort((a, b) => b.count - a.count)
+}
+
 export function planTotals(plan?: MealPlan): { cost: number; savings: number; meals: number } {
   const p = plan ?? readPlan()
   let cost = 0

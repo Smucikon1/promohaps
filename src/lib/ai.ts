@@ -22,10 +22,30 @@ export interface GenerateRecipeInput {
   theme?: string
   categorySlugs?: string[]
   promoProducts?: any[]
+  /** Tytuły istniejących przepisów — model ma ich nie powtarzać */
+  avoidTitles?: string[]
+  /** Produkty użyte w innych przepisach tego tygodnia — warto je wykorzystać ponownie */
+  reuseProducts?: string[]
 }
 
+// Losowy kierunek kulinarny — bez tego model ciągle proponuje makaron z kurczakiem
+const CUISINES = [
+  'kuchnia polska domowa', 'włoska', 'azjatycka (stir-fry)', 'meksykańska',
+  'śródziemnomorska', 'bliskowschodnia', 'węgierska/bałkańska', 'kuchnia jednogarnkowa',
+]
+const TECHNIQUES = [
+  'zapiekanka z piekarnika', 'danie jednopatelniowe', 'zupa krem', 'gulasz duszony',
+  'sałatka na ciepło', 'placki/kotlety smażone', 'danie z blachy', 'makaron z sosem',
+]
+const MEALS = ['obiad', 'kolacja', 'śniadanie', 'szybki lunch', 'danie na wynos do pracy']
+
+const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)]
+
 export async function generateRecipeJson(input: GenerateRecipeInput): Promise<any> {
-  const { storeSlug, storeName, theme, categorySlugs = [], promoProducts = [] } = input
+  const {
+    storeSlug, storeName, theme, categorySlugs = [], promoProducts = [],
+    avoidTitles = [], reuseProducts = [],
+  } = input
 
   const schema = {
     type: 'object',
@@ -99,13 +119,31 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     'min_quantity oraz valid_from i valid_to (nie wymyślaj dat — przy braku daj null).',
     'slug bez polskich znaków, myślniki; difficulty dokładnie jedno z latwy|sredni|trudny;',
     'nie kopiuj treści gazetek — twórz oryginalny przepis (fakty: nazwy i ceny produktów są dozwolone).',
+    '',
+    'JAKOŚĆ I RÓŻNORODNOŚĆ (bardzo ważne):',
+    '- kroki konkretne i wykonalne: temperatura, czas, wielkość kawałków, na co zwrócić uwagę;',
+    '- 5–9 kroków, każdy jedno działanie; bez lania wody i pustych zwrotów;',
+    '- description to 1–2 zdania sprzedające danie (smak, tekstura), nie spis składników;',
+    '- NIE powtarzaj przepisów z listy „unikaj_tytulow" ani ich wariantów;',
+    '- unikaj oklepanych domyślnych dań (makaron z kurczakiem w śmietanie) — chyba że temat tego wymaga;',
+    '- trzymaj się zadanego kierunku (kuchnia, technika, pora posiłku) z pola „wytyczne".',
   ].join('\n')
 
   const payload = {
     sklep: { slug: storeSlug, nazwa: storeName },
     temat: theme || '(dowolny — dobierz apetyczny, tani przepis)',
+    wytyczne: theme
+      ? '(temat nadrzędny — kieruj się tematem)'
+      : { kuchnia: pick(CUISINES), technika: pick(TECHNIQUES), pora: pick(MEALS) },
     dostepne_kategorie: categorySlugs,
     produkty_z_gazetki: promoProducts,
+    unikaj_tytulow: avoidTitles.slice(0, 40),
+    wykorzystaj_ponownie: reuseProducts.length
+      ? {
+          produkty: reuseProducts,
+          po_co: 'Te produkty są już kupowane do innych przepisów w tym tygodniu — użyj przynajmniej jednego, żeby jedno opakowanie starczyło na dwa dania.',
+        }
+      : undefined,
     instrukcja: 'Wygeneruj jeden kompletny przepis zgodny ze schematem, wykorzystując produkty z gazetki jako składniki, jeśli podano.',
   }
 
