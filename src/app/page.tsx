@@ -160,13 +160,9 @@ export default async function HomePage({ searchParams }: HomeProps) {
   return (
     <div>
       {/* Pasek wyszukiwania + lokalizacja */}
-      <section style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #faf9f6 100%)' }} className="py-6">
+      <section style={{ background: 'linear-gradient(135deg, #e8f3ff 0%, #d0e8ff 50%, #faf9f6 100%)' }} className="py-6">
         <div className="max-w-6xl mx-auto px-4">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full mb-3"
-              style={{ background: '#dbeafe', color: '#1e40af' }}>
-              📍 Cała Polska · aktualne promocje
-            </div>
             <Suspense>
               <SearchBar />
             </Suspense>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Sora, Plus_Jakarta_Sans } from 'next/font/google'
+import { Outfit } from 'next/font/google'
 import Link from 'next/link'
 import { SITE_URL } from '@/lib/site'
 import './globals.css'
@@ -8,16 +8,17 @@ import { BottomNav } from '@/components/layout/BottomNav'
 import { AnalyticsBanner } from '@/components/layout/AnalyticsBanner'
 import { ServiceWorkerRegister } from '@/components/layout/ServiceWorkerRegister'
 
-const jakarta = Plus_Jakarta_Sans({
+// Outfit dla całego dokumentu — tekst (--font-sans) i nagłówki (--font-serif)
+const outfitSans = Outfit({
   subsets: ['latin', 'latin-ext'],
-  weight: ['400', '500', '600', '700', '800'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
   display: 'swap',
 })
 
-const sora = Sora({
+const outfitDisplay = Outfit({
   subsets: ['latin', 'latin-ext'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['500', '600', '700'],
   variable: '--font-serif',
   display: 'swap',
 })
@@ -46,7 +47,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pl" className={`${jakarta.variable} ${sora.variable}`}>
+    <html lang="pl" className={`${outfitSans.variable} ${outfitDisplay.variable}`}>
       <body>
         <ServiceWorkerRegister />
         <Header />

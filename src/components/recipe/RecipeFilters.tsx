@@ -1,12 +1,14 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useTransition } from 'react'
-import { X, Store as StoreIcon, LayoutGrid, Gauge, ArrowDownUp } from 'lucide-react'
+import { useCallback, useState, useTransition } from 'react'
+import { X, Store as StoreIcon, SlidersHorizontal, LayoutGrid, Gauge, ArrowDownUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { storeColor } from '@/lib/stores'
 import { track } from '@/lib/analytics'
 import type { Store, Category } from '@/types'
+
+const ICON = 'text-[#1595ff]'
 
 interface FiltersProps {
   stores: Store[]
@@ -16,7 +18,7 @@ interface FiltersProps {
 function SectionLabel({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
     <p className="flex items-center gap-1.5 text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2">
-      <Icon className="w-3.5 h-3.5 text-stone-400" />
+      <Icon className={cn('w-3.5 h-3.5', ICON)} />
       {children}
     </p>
   )
@@ -31,6 +33,12 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
   const activeCategory = params.get('category')
   const activeDifficulty = params.get('difficulty')
   const activeSort = params.get('sort') ?? 'new'
+
+  const advancedCount =
+    [activeCategory, activeDifficulty].filter(Boolean).length + (activeSort !== 'new' ? 1 : 0)
+
+  // Panel otwarty od razu, jeśli jakiś zaawansowany filtr jest aktywny
+  const [open, setOpen] = useState<boolean>(advancedCount > 0)
 
   const setParam = useCallback(
     (key: string, value: string | null) => {
@@ -49,8 +57,8 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
   const hasFilters = activeStore || activeCategory || activeDifficulty || activeSort !== 'new'
 
   return (
-    <div className={cn('space-y-5 transition-opacity', isPending && 'opacity-60')}>
-      {/* Sklepy — wyróżnione, z kolorem marki */}
+    <div className={cn('space-y-4 transition-opacity', isPending && 'opacity-60')}>
+      {/* Sklepy — zawsze widoczne */}
       <div>
         <SectionLabel icon={StoreIcon}>Sklep</SectionLabel>
         <div className="flex flex-wrap gap-2">
@@ -82,78 +90,101 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
         </div>
       </div>
 
-      {/* Kategorie — przewijane pill-taby */}
-      <div>
-        <SectionLabel icon={LayoutGrid}>Kategoria</SectionLabel>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
-          {categories.map((cat) => {
-            const active = activeCategory === cat.slug
-            return (
-              <button
-                key={cat.id}
-                aria-pressed={active}
-                onClick={() => {
-                  setParam('category', active ? null : cat.slug)
-                  track.categoryClick(cat.id)
-                }}
-                className={cn('category-pill flex-shrink-0 whitespace-nowrap', active && 'active')}
-              >
-                {cat.icon} {cat.name}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      {/* Przycisk „Filtry" — chowa kategorię, trudność i sortowanie */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={cn(
+          'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors',
+          open || advancedCount > 0
+            ? 'border-[#1595ff] text-[#1595ff] bg-[#e8f3ff]'
+            : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300'
+        )}
+      >
+        <SlidersHorizontal className="w-4 h-4" />
+        Filtry
+        {advancedCount > 0 && (
+          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-xs font-bold bg-[#1595ff] text-white">
+            {advancedCount}
+          </span>
+        )}
+      </button>
 
-      {/* Trudność + Sortowanie w jednym rzędzie (na dole) */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <SectionLabel icon={Gauge}>Trudność</SectionLabel>
-          <div className="flex gap-2">
-            {[
-              { value: 'latwy', label: 'Łatwy' },
-              { value: 'sredni', label: 'Średni' },
-              { value: 'trudny', label: 'Trudny' },
-            ].map((d) => {
-              const active = activeDifficulty === d.value
-              return (
-                <button
-                  key={d.value}
-                  aria-pressed={active}
-                  onClick={() => setParam('difficulty', active ? null : d.value)}
-                  className={cn('category-pill', active && 'active')}
-                >
-                  {d.label}
-                </button>
-              )
-            })}
+      {/* Panel zaawansowany — zawija się (bez chowania za krawędzią) */}
+      {open && (
+        <div className="space-y-5 border-t border-stone-100 pt-4">
+          <div>
+            <SectionLabel icon={LayoutGrid}>Kategoria</SectionLabel>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => {
+                const active = activeCategory === cat.slug
+                return (
+                  <button
+                    key={cat.id}
+                    aria-pressed={active}
+                    onClick={() => {
+                      setParam('category', active ? null : cat.slug)
+                      track.categoryClick(cat.id)
+                    }}
+                    className={cn('category-pill', active && 'active')}
+                  >
+                    {cat.icon} {cat.name}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </div>
 
-        <div>
-          <SectionLabel icon={ArrowDownUp}>Sortuj</SectionLabel>
-          <select
-            id="sort"
-            value={activeSort}
-            onChange={(e) => setParam('sort', e.target.value === 'new' ? null : e.target.value)}
-            className="text-sm border border-stone-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-amber-400"
-          >
-            <option value="new">Najnowsze</option>
-            <option value="cheap">Najtańsze</option>
-            <option value="fast">Najszybsze</option>
-          </select>
-        </div>
-      </div>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <SectionLabel icon={Gauge}>Trudność</SectionLabel>
+              <div className="flex gap-2">
+                {[
+                  { value: 'latwy', label: 'Łatwy' },
+                  { value: 'sredni', label: 'Średni' },
+                  { value: 'trudny', label: 'Trudny' },
+                ].map((d) => {
+                  const active = activeDifficulty === d.value
+                  return (
+                    <button
+                      key={d.value}
+                      aria-pressed={active}
+                      onClick={() => setParam('difficulty', active ? null : d.value)}
+                      className={cn('category-pill', active && 'active')}
+                    >
+                      {d.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
-      {/* Wyczyść filtry */}
-      {hasFilters && (
-        <button
-          onClick={clearAll}
-          className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-red-500 transition-colors"
-        >
-          <X className="w-4 h-4" />
-          Wyczyść filtry
-        </button>
+            <div>
+              <SectionLabel icon={ArrowDownUp}>Sortuj</SectionLabel>
+              <select
+                id="sort"
+                value={activeSort}
+                onChange={(e) => setParam('sort', e.target.value === 'new' ? null : e.target.value)}
+                className="text-sm border border-stone-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-[#1595ff]"
+              >
+                <option value="new">Najnowsze</option>
+                <option value="cheap">Najtańsze</option>
+                <option value="fast">Najszybsze</option>
+              </select>
+            </div>
+          </div>
+
+          {hasFilters && (
+            <button
+              onClick={clearAll}
+              className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-red-500 transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Wyczyść filtry
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

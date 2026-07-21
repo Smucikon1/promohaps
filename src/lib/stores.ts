@@ -4,6 +4,7 @@ export const STORE_COLORS: Record<string, string> = {
   lidl: '#0050aa',
   auchan: '#cc0000',
   carrefour: '#004a97',
+  kaufland: '#e10915',
 }
 
 export function storeColor(slug?: string | null): string {

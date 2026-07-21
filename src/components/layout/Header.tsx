@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ShoppingCart, ChefHat, Heart, CalendarDays } from 'lucide-react'
+import { ShoppingCart, Heart, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { countShoppingItems, SHOPPING_EVENT } from '@/lib/shopping'
 import { countFavorites, FAVORITES_EVENT } from '@/lib/favorites'
@@ -49,13 +49,9 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-stone-100">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-bold text-stone-800">
-          <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-            <ChefHat className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-lg" style={{ fontFamily: 'var(--font-serif)' }}>
-            Przepisnik
-          </span>
+        <Link href="/" aria-label="Sapri — strona główna" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Sapri" className="h-7 w-auto" />
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-stone-600">
