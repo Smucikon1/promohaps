@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { SITE_URL } from '@/lib/site'
+import { COLLECTIONS } from '@/lib/collections'
 
 export default async function Sitemap() {
   const supabase = await createClient()
@@ -35,10 +36,15 @@ export default async function Sitemap() {
     lastModified: new Date(),
   }))
 
+  const collectionPages = COLLECTIONS.map((c) => ({
+    url: `${base}/kolekcja/${c.slug}`,
+    lastModified: new Date(),
+  }))
+
   const recipePages = (recipes ?? []).map((r) => ({
     url: `${base}/przepis/${r.slug}`,
     lastModified: new Date(r.updated_at),
   }))
 
-  return [...staticPages, ...storePages, ...categoryPages, ...recipePages]
+  return [...staticPages, ...storePages, ...categoryPages, ...collectionPages, ...recipePages]
 }
