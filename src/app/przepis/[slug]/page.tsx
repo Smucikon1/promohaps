@@ -256,7 +256,6 @@ export default async function RecipePage({ params }: Props) {
             <ShoppingList
               recipeId={normalized.id}
               ingredients={normalized.ingredients}
-              promoProducts={activePromos}
             />
           </div>
 

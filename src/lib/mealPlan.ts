@@ -88,10 +88,7 @@ export function sharedProducts(plan?: MealPlan): { name: string; count: number }
 
   for (const list of Object.values(p)) {
     for (const r of list) {
-      const names = [
-        ...r.ingredients.map((i) => i.name),
-        ...r.promos.map((pr) => pr.name),
-      ]
+      const names = r.ingredients.map((i) => i.name)
       for (const raw of names) {
         const key = String(raw ?? '').trim().toLowerCase()
         if (!key) continue
@@ -107,86 +104,74 @@ export function sharedProducts(plan?: MealPlan): { name: string; count: number }
     .sort((a, b) => b.count - a.count)
 }
 
+// Ile przepisów w planie używa danego składnika (po nazwie)
+export function usageCounts(plan?: MealPlan): Map<string, number> {
+  const p = plan ?? readPlan()
+  const map = new Map<string, number>()
+  for (const list of Object.values(p)) {
+    for (const r of list) {
+      const seen = new Set<string>()
+      for (const i of r.ingredients) {
+        const k = i.name.trim().toLowerCase()
+        if (!k || seen.has(k)) continue
+        seen.add(k)
+        map.set(k, (map.get(k) ?? 0) + 1)
+      }
+    }
+  }
+  return map
+}
+
+// Koszt przepisu W PLANIE: cena OPAKOWANIA każdego składnika podzielona przez
+// liczbę przepisów, które go używają (współdzielone opakowanie kupujesz raz).
+export function recipeCostInPlan(r: PlannedRecipe, counts: Map<string, number>): number {
+  const cost = r.ingredients.reduce((s, i) => {
+    if (i.price == null) return s
+    const c = counts.get(i.name.trim().toLowerCase()) || 1
+    return s + i.price / c
+  }, 0)
+  return Math.round(cost * 100) / 100
+}
+
 export function planTotals(plan?: MealPlan): { cost: number; savings: number; meals: number } {
   const p = plan ?? readPlan()
+  const counts = usageCounts(p)
   let cost = 0
-  let savings = 0
   let meals = 0
   for (const list of Object.values(p)) {
     for (const r of list) {
-      cost += r.price_total ?? 0
-      savings += r.savings ?? 0
+      cost += recipeCostInPlan(r, counts)
       meals++
     }
   }
-  return { cost, savings, meals }
+  return { cost: Math.round(cost * 100) / 100, savings: 0, meals }
 }
 
-function parseNum(v: string | null): number | null {
-  if (!v) return null
-  const raw = v.trim().replace(',', '.')
-  const frac = raw.match(/^(\d+)\s*\/\s*(\d+)$/)
-  if (frac) {
-    const d = parseInt(frac[2], 10)
-    return d !== 0 ? parseInt(frac[1], 10) / d : null
-  }
-  if (/^\d*\.?\d+$/.test(raw)) return parseFloat(raw)
-  return null
-}
-
-// Scala składniki z całego jadłospisu w jedną listę zakupów (sumuje ilości numeryczne,
-// deduplikuje produkty z gazetki).
+// Lista zakupów z jadłospisu: każdy produkt raz, po cenie opakowania (bez sumowania,
+// bo współdzielone opakowanie kupujesz jednokrotnie).
 export function planToShoppingItems(plan?: MealPlan): ShoppingItem[] {
   const p = plan ?? readPlan()
-  const promoMap = new Map<string, ShoppingItem>()
   const ingMap = new Map<string, ShoppingItem>()
 
   for (const list of Object.values(p)) {
     for (const r of list) {
-      for (const pr of r.promos) {
-        if (!promoMap.has(pr.id)) {
-          promoMap.set(pr.id, {
-            id: `promo-${pr.id}`,
-            name: pr.name,
-            amount: null,
-            unit: null,
-            isPromo: true,
-            price: pr.price_promo,
-            priceRegular: pr.price_regular,
-            fixedPrice: true,
-            checked: false,
-          })
-        }
-      }
       for (const ing of r.ingredients) {
         const key = `${ing.name.trim().toLowerCase()}|${(ing.unit ?? '').trim().toLowerCase()}`
-        const existing = ingMap.get(key)
-        if (!existing) {
-          ingMap.set(key, {
-            id: `ing-${key}`,
-            name: ing.name,
-            amount: ing.amount,
-            unit: ing.unit,
-            isPromo: ing.isPromo,
-            price: ing.price ?? null,
-            priceRegular: null,
-            fixedPrice: false,
-            checked: false,
-          })
-        } else {
-          const a = parseNum(existing.amount)
-          const b = parseNum(ing.amount)
-          if (a != null && b != null) {
-            existing.amount = String(Math.round((a + b) * 100) / 100).replace('.', ',')
-          }
-          if (ing.price != null) {
-            existing.price = Math.round(((existing.price ?? 0) + ing.price) * 100) / 100
-          }
-          existing.isPromo = existing.isPromo || ing.isPromo
-        }
+        if (ingMap.has(key)) continue
+        ingMap.set(key, {
+          id: `ing-${key}`,
+          name: ing.name,
+          amount: ing.amount,
+          unit: ing.unit,
+          isPromo: ing.isPromo,
+          price: ing.price ?? null,
+          priceRegular: null,
+          fixedPrice: true,
+          checked: false,
+        })
       }
     }
   }
 
-  return [...promoMap.values(), ...ingMap.values()]
+  return [...ingMap.values()]
 }

@@ -13,6 +13,8 @@ import {
   clearPlan,
   planTotals,
   sharedProducts,
+  usageCounts,
+  recipeCostInPlan,
   planToShoppingItems,
   MEAL_PLAN_EVENT,
   type MealPlan,
@@ -42,6 +44,7 @@ export default function PlanPage() {
 
   const totals = planTotals(plan)
   const shared = sharedProducts(plan)
+  const counts = usageCounts(plan)
   const isEmpty = totals.meals === 0
 
   const generateList = () => {
@@ -172,7 +175,10 @@ export default function PlanPage() {
                               <p className="text-sm font-medium text-stone-700 truncate group-hover:text-amber-600 transition-colors">{r.title}</p>
                               <div className="flex items-center gap-2 text-xs">
                                 {r.store_name && <span className="text-stone-400">{r.store_name}</span>}
-                                {r.price_total != null && <span className="text-amber-600 font-semibold">{formatPrice(r.price_total)}</span>}
+                                <span className="text-amber-600 font-semibold">{formatPrice(recipeCostInPlan(r, counts))}</span>
+                                {r.ingredients.some((i) => (counts.get(i.name.trim().toLowerCase()) || 1) > 1) && (
+                                  <span className="text-green-600" title="Część opakowań dzielona z innymi przepisami">♻️ dzielone</span>
+                                )}
                               </div>
                             </div>
                           </Link>
