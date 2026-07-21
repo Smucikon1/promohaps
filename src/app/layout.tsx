@@ -26,15 +26,15 @@ const outfitDisplay = Outfit({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Przepisnik z Gazetek | Przepisy z promocji Biedronka, Lidl, Auchan, Carrefour',
-    template: '%s | Przepisnik z Gazetek',
+    default: 'Sapri — przepisy z promocji: Biedronka, Lidl, Auchan, Carrefour, Kaufland',
+    template: '%s | Sapri',
   },
-  description: 'Przepisy kulinarne oparte na aktualnych promocjach w Biedronce, Lidlu, Auchan i Carrefour. Gotuj taniej korzystając z gazetek promocyjnych.',
-  keywords: ['przepisy', 'gazetka promocyjna', 'biedronka', 'lidl', 'auchan', 'carrefour', 'tanie gotowanie'],
-  openGraph: { type: 'website', locale: 'pl_PL', siteName: 'Przepisnik z Gazetek' },
+  description: 'Sapri — przepisy kulinarne oparte na aktualnych promocjach w Biedronce, Lidlu, Auchan, Carrefour i Kauflandzie. Gotuj taniej dzięki gazetkom promocyjnym.',
+  keywords: ['sapri', 'przepisy', 'gazetka promocyjna', 'biedronka', 'lidl', 'auchan', 'carrefour', 'kaufland', 'tanie gotowanie'],
+  openGraph: { type: 'website', locale: 'pl_PL', siteName: 'Sapri' },
   robots: { index: true, follow: true },
-  applicationName: 'Przepisnik',
-  appleWebApp: { capable: true, title: 'Przepisnik', statusBarStyle: 'default' },
+  applicationName: 'Sapri',
+  appleWebApp: { capable: true, title: 'Sapri', statusBarStyle: 'default' },
   icons: {
     icon: '/icon.svg',
     apple: '/icon.svg',
@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AnalyticsBanner />
         <footer className="hidden md:block bg-white border-t border-stone-100 py-8 mt-16">
           <div className="max-w-6xl mx-auto px-4 text-center text-stone-500 text-sm">
-            <p>© {new Date().getFullYear()} Przepisnik z Gazetek · Polska</p>
+            <p>© {new Date().getFullYear()} Sapri</p>
             <p className="mt-1">Przepisy tworzone na podstawie aktualnych gazetek promocyjnych</p>
             <p className="mt-3 flex items-center justify-center gap-4">
               <Link href="/polityka-prywatnosci" className="hover:text-stone-600 transition-colors">Polityka prywatności</Link>

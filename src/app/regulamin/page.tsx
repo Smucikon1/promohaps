@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Regulamin',
-  description: 'Regulamin korzystania z serwisu Przepisnik z Gazetek.',
+  description: 'Regulamin korzystania z serwisu Sapri.',
   robots: { index: true, follow: true },
 }
 
@@ -26,7 +26,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-lg font-bold text-stone-900 mb-2">1. Postanowienia ogólne</h2>
-          <p>Serwis „Przepisnik z Gazetek" udostępnia przepisy kulinarne powiązane z aktualnymi promocjami w sieciach handlowych. Usługodawcą jest <strong>[nazwa firmy / imię i nazwisko]</strong>.</p>
+          <p>Serwis „Sapri" (sapri.pl) udostępnia przepisy kulinarne powiązane z aktualnymi promocjami w sieciach handlowych. Usługodawcą jest <strong>[nazwa firmy / imię i nazwisko]</strong>.</p>
         </section>
 
         <section>

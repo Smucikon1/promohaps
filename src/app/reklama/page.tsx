@@ -4,7 +4,7 @@ import { ArrowLeft, Megaphone, Target, BarChart3, Mail } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Reklama i współpraca',
-  description: 'Dotrzyj do osób planujących zakupy spożywcze i gotowanie z promocji. Reklama displayowa i przepisy sponsorowane w Przepisniku z Gazetek.',
+  description: 'Dotrzyj do osób planujących zakupy spożywcze i gotowanie z promocji. Reklama displayowa i przepisy sponsorowane w Sapri.',
   robots: { index: true, follow: true },
 }
 
@@ -47,7 +47,7 @@ export default function AdvertisePage() {
           <p className="text-sm text-stone-500 mt-1">Wyślemy media-kit z aktualnymi statystykami zasięgu i cennikiem.</p>
         </div>
         <a
-          href="mailto:[adres e-mail]?subject=Reklama w Przepisniku"
+          href="mailto:[adres e-mail]?subject=Reklama w Sapri"
           className="btn-primary inline-flex items-center gap-2 justify-center"
         >
           <Mail className="w-4 h-4" />

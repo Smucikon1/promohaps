@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Polityka prywatności',
-  description: 'Zasady przetwarzania danych i wykorzystania cookies w serwisie Przepisnik z Gazetek.',
+  description: 'Zasady przetwarzania danych i wykorzystania cookies w serwisie Sapri.',
   robots: { index: true, follow: true },
 }
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, BookOpen, BarChart3, LogOut, ChefHat, Tag, ScanLine } from 'lucide-react'
+import { LayoutDashboard, BookOpen, BarChart3, LogOut, Tag, ScanLine } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -28,15 +28,11 @@ export function AdminNav() {
   return (
     <aside className="w-56 bg-white border-r border-stone-100 flex flex-col min-h-screen">
       <div className="p-5 border-b border-stone-50">
-        <Link href="/" className="flex items-center gap-2 text-stone-700 hover:text-amber-600 transition-colors">
-          <div className="w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center">
-            <ChefHat className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold text-sm" style={{ fontFamily: 'var(--font-serif)' }}>
-            Przepisnik
-          </span>
+        <Link href="/" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Sapri" className="h-6 w-auto" />
         </Link>
-        <p className="text-xs text-stone-400 mt-1 ml-9">Panel admina</p>
+        <p className="text-xs text-stone-400 mt-1">Panel admina</p>
       </div>
 
       <nav className="flex-1 p-3 space-y-1">

@@ -5,6 +5,7 @@ import { useCallback, useState, useTransition } from 'react'
 import { X, Store as StoreIcon, SlidersHorizontal, LayoutGrid, Gauge, ArrowDownUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { storeColor } from '@/lib/stores'
+import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { track } from '@/lib/analytics'
 import type { Store, Category } from '@/types'
 
@@ -129,7 +130,8 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
                     }}
                     className={cn('category-pill', active && 'active')}
                   >
-                    {cat.icon} {cat.name}
+                    <CategoryIcon slug={cat.slug} className={cn('w-3.5 h-3.5', active ? 'text-[#0a4f8c]' : 'text-[#1595ff]')} />
+                    {cat.name}
                   </button>
                 )
               })}
