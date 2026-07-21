@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google'
 import Link from 'next/link'
+import { SITE_URL } from '@/lib/site'
 import './globals.css'
 import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
@@ -22,6 +23,7 @@ const sora = Sora({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'Przepisnik z Gazetek | Przepisy z promocji Biedronka, Lidl, Auchan, Carrefour',
     template: '%s | Przepisnik z Gazetek',

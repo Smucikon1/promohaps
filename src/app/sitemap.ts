@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
+import { SITE_URL } from '@/lib/site'
 
 export default async function Sitemap() {
   const supabase = await createClient()
@@ -15,7 +16,7 @@ export default async function Sitemap() {
   const hiddenSet = new Set(hidden)
   const recipes = (allRecipes ?? []).filter((r) => !hiddenSet.has(r.id))
 
-  const base = 'https://przepisnik-z-gazetek.pl'
+  const base = SITE_URL
 
   const staticPages = [
     { url: base, lastModified: new Date() },
