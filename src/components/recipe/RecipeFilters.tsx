@@ -34,6 +34,7 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
   const activeCategory = params.get('category')
   const activeDifficulty = params.get('difficulty')
   const activeSort = params.get('sort') ?? 'new'
+  const activeMaxPrice = params.get('maxPrice')
 
   const advancedCount =
     [activeCategory, activeDifficulty].filter(Boolean).length + (activeSort !== 'new' ? 1 : 0)
@@ -55,7 +56,7 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
   )
 
   const clearAll = () => startTransition(() => router.push('/', { scroll: false }))
-  const hasFilters = activeStore || activeCategory || activeDifficulty || activeSort !== 'new'
+  const hasFilters = activeStore || activeCategory || activeDifficulty || activeSort !== 'new' || activeMaxPrice
 
   return (
     <div className={cn('space-y-4 transition-opacity', isPending && 'opacity-60')}>
@@ -91,26 +92,48 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
         </div>
       </div>
 
-      {/* Przycisk „Filtry" — chowa kategorię, trudność i sortowanie */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className={cn(
-          'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors',
-          open || advancedCount > 0
-            ? 'border-[#1595ff] text-[#1595ff] bg-[#e8f3ff]'
-            : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300'
-        )}
-      >
-        <SlidersHorizontal className="w-4 h-4" />
-        Filtry
-        {advancedCount > 0 && (
-          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-xs font-bold bg-[#1595ff] text-white">
-            {advancedCount}
-          </span>
-        )}
-      </button>
+      {/* Przycisk „Filtry" + szybkie kwoty (do X zł) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className={cn(
+            'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors',
+            open || advancedCount > 0
+              ? 'border-[#1595ff] text-[#1595ff] bg-[#e8f3ff]'
+              : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300'
+          )}
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          Filtry
+          {advancedCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-xs font-bold bg-[#1595ff] text-white">
+              {advancedCount}
+            </span>
+          )}
+        </button>
+
+        <span className="w-px h-6 bg-stone-200 mx-0.5 hidden sm:block" />
+
+        {[15, 25, 40].map((v) => {
+          const active = activeMaxPrice === String(v)
+          return (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setParam('maxPrice', active ? null : String(v))}
+              className={cn(
+                'px-3 py-2 rounded-xl text-sm font-semibold border transition-colors',
+                active ? 'bg-[#1595ff] text-white border-transparent' : 'bg-white text-[#1595ff] border-[#9dc9ff] hover:border-[#1595ff]'
+              )}
+            >
+              do {v} zł
+            </button>
+          )
+        })}
+      </div>
 
       {/* Panel zaawansowany — zawija się (bez chowania za krawędzią) */}
       {open && (

@@ -7,7 +7,6 @@ import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { fetchRecipes, storeRecipeCounts } from '@/lib/recipeQuery'
 import { COLLECTIONS } from '@/lib/collections'
 import { storeColor } from '@/lib/stores'
-import { cn } from '@/lib/utils'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { Flame, Store as StoreIcon, LayoutGrid, CalendarDays } from 'lucide-react'
 import Link from 'next/link'
@@ -15,7 +14,6 @@ import { Suspense } from 'react'
 import type { Store, Category } from '@/types'
 
 const PAGE_SIZE = 12
-const PRICE_CHIPS = [15, 25, 40]
 
 type SearchParams = {
   store?: string; category?: string; difficulty?: string; search?: string
@@ -24,16 +22,6 @@ type SearchParams = {
 
 interface HomeProps {
   searchParams: Promise<SearchParams>
-}
-
-function buildUrl(params: SearchParams, patch: Record<string, string | null>): string {
-  const merged: Record<string, any> = { ...params, ...patch }
-  const sp = new URLSearchParams()
-  for (const [k, v] of Object.entries(merged)) {
-    if (v && k !== 'limit') sp.set(k, String(v))
-  }
-  const s = sp.toString()
-  return s ? `/?${s}` : '/'
 }
 
 function pluralPrzepis(n: number): string {
@@ -54,28 +42,6 @@ function GridSkeleton() {
           </div>
         </div>
       ))}
-    </div>
-  )
-}
-
-function PriceChips({ params }: { params: SearchParams }) {
-  return (
-    <div className="flex flex-wrap gap-2 mt-3">
-      {PRICE_CHIPS.map((v) => {
-        const active = params.maxPrice === String(v)
-        return (
-          <Link
-            key={v}
-            href={buildUrl(params, { maxPrice: active ? null : String(v) })}
-            className={cn(
-              'px-3.5 py-1.5 rounded-full text-sm font-semibold border transition-colors',
-              active ? 'bg-[#1595ff] text-white border-transparent' : 'bg-white/90 text-[#1595ff] border-[#1595ff]/40 hover:border-[#1595ff]'
-            )}
-          >
-            do {v} zł
-          </Link>
-        )
-      })}
     </div>
   )
 }
@@ -283,7 +249,6 @@ export default async function HomePage({ searchParams }: HomeProps) {
             <Suspense>
               <SearchBar />
             </Suspense>
-            <PriceChips params={params} />
           </div>
         </div>
       </section>
