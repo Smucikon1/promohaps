@@ -8,6 +8,7 @@ import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActiv
 import { storeColor } from '@/lib/stores'
 import { ShoppingList } from '@/components/recipe/ShoppingList'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
+import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { RecipeActions } from '@/components/recipe/RecipeActions'
 import { AddToPlan } from '@/components/recipe/AddToPlan'
 import { AdSlot } from '@/components/ads/AdSlot'
@@ -124,11 +125,12 @@ export default async function RecipePage({ params }: Props) {
         key={cat.id}
         className={
           light
-            ? 'text-xs bg-white/20 text-white backdrop-blur-sm px-2.5 py-1 rounded-full'
-            : 'text-xs bg-stone-100 text-stone-600 px-2.5 py-1 rounded-full'
+            ? 'inline-flex items-center gap-1.5 text-xs bg-white/20 text-white backdrop-blur-sm px-2.5 py-1 rounded-full'
+            : 'inline-flex items-center gap-1.5 text-xs bg-stone-100 text-stone-600 px-2.5 py-1 rounded-full'
         }
       >
-        {cat.icon} {cat.name}
+        <CategoryIcon slug={cat.slug} className={light ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5 text-[#1595ff]'} />
+        {cat.name}
       </span>
     ))
 

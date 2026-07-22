@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Clock, Flame } from 'lucide-react'
+import { Clock, Flame, Tag, UtensilsCrossed } from 'lucide-react'
 import { formatPrice, formatTime, difficultyLabel, promoDaysLeftLabel, cn } from '@/lib/utils'
 import { storeColor } from '@/lib/stores'
 import { activePromos } from '@/lib/savings'
 import { FavoriteButton } from '@/components/recipe/FavoriteButton'
+import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import type { Recipe } from '@/types'
 import { track } from '@/lib/analytics'
 
@@ -56,8 +57,8 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-4xl bg-gradient-to-br from-amber-50 to-stone-100">
-              🍽️
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-50 to-stone-100">
+              <UtensilsCrossed className="w-9 h-9 text-[#1595ff]" />
             </div>
           )}
 
@@ -74,8 +75,9 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
           {/* Ważność promocji + warunek karty */}
           {hasActivePromo && nearestEnd && (
             <div className="absolute bottom-3 left-3 flex flex-wrap items-center gap-1.5">
-              <div className="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
-                🏷️ {promoDaysLeftLabel(nearestEnd)}
+              <div className="inline-flex items-center gap-1 bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
+                <Tag className="w-3 h-3" />
+                {promoDaysLeftLabel(nearestEnd)}
               </div>
               {needsCard && (
                 <div className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm">
@@ -91,8 +93,9 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
           {recipe.categories && recipe.categories.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
               {recipe.categories.slice(0, 2).map((cat) => (
-                <span key={cat.id} className="text-xs text-stone-500 bg-stone-50 px-2 py-0.5 rounded-full">
-                  {cat.icon} {cat.name}
+                <span key={cat.id} className="inline-flex items-center gap-1 text-xs text-stone-500 bg-stone-50 px-2 py-0.5 rounded-full">
+                  <CategoryIcon slug={cat.slug} className="w-3 h-3 text-[#1595ff]" />
+                  {cat.name}
                 </span>
               ))}
             </div>

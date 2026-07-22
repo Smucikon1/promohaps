@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, Plus, Trash2, Upload, X } from 'lucide-react'
 import type { Store, Category } from '@/types'
+import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -309,7 +310,8 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
               onClick={() => toggleCategory(cat.id)}
               className={cn('category-pill', selectedCategories.includes(cat.id) && 'active')}
             >
-              {cat.icon} {cat.name}
+              <CategoryIcon slug={cat.slug} className="w-3.5 h-3.5 text-[#1595ff]" />
+              {cat.name}
             </button>
           ))}
         </div>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
+import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { isPromoExpired } from '@/lib/utils'
 
 interface Props {
@@ -63,8 +64,9 @@ export default async function CategoryPage({ params }: Props) {
         <ArrowLeft className="w-4 h-4" /> Wszystkie przepisy
       </Link>
 
-      <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>
-        {cat.icon} {cat.name}
+      <h1 className="flex items-center gap-2.5 text-3xl md:text-4xl font-bold text-stone-900 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>
+        <CategoryIcon slug={cat.slug} className="w-7 h-7 text-[#1595ff]" />
+        {cat.name}
       </h1>
       <p className="text-stone-600 mb-8 max-w-2xl">
         Tanie przepisy z kategorii „{cat.name}" oparte na aktualnych promocjach.

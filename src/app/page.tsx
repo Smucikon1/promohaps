@@ -3,6 +3,7 @@ import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeFilters } from '@/components/recipe/RecipeFilters'
 import { SearchBar } from '@/components/recipe/SearchBar'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
+import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { fetchRecipes, storeRecipeCounts } from '@/lib/recipeQuery'
 import { COLLECTIONS } from '@/lib/collections'
@@ -287,7 +288,10 @@ export default async function HomePage({ searchParams }: HomeProps) {
           <h2 className="text-lg font-bold text-stone-800 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>Przepisy według kategorii</h2>
           <div className="flex flex-wrap gap-2 mb-6">
             {(categories ?? []).map((c) => (
-              <Link key={c.id} href={`/kategoria/${c.slug}`} className="category-pill">{c.icon} {c.name}</Link>
+              <Link key={c.id} href={`/kategoria/${c.slug}`} className="category-pill">
+                <CategoryIcon slug={c.slug} className="w-3.5 h-3.5 text-[#1595ff]" />
+                {c.name}
+              </Link>
             ))}
           </div>
           <h2 className="text-lg font-bold text-stone-800 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>Kolekcje</h2>
