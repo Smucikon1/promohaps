@@ -64,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ServiceWorkerRegister />
         <NavDepthTracker />
         <Header />
-        <main className="min-h-screen pb-20 md:pb-0 isolate">{children}</main>
+        <main className="min-h-screen pb-20 md:pb-0">{children}</main>
         <BottomNav />
         <AnalyticsBanner />
         <Analytics />
