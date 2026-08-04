@@ -183,22 +183,12 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [] }: Shop
         </div>
       )}
 
-      {/* Akcja: dodaj / status na liście — z mikroanimacją i komunikatem po dodaniu */}
+      {/* Akcja: dodaj / status na liście — bez animacji transform, żeby nie psuć hit-testingu klikalnych elementów pod spodem */}
       {total > 0 && (
         exists ? (
-          <div
-            className={cn(
-              'px-5 py-3 border-t border-stone-100 flex items-center justify-between bg-green-50/50 transition-all',
-              justAdded && 'animate-pop-in'
-            )}
-          >
+          <div className="px-5 py-3 border-t border-stone-100 flex items-center justify-between bg-green-50/50">
             <span className="text-sm font-medium text-green-700 inline-flex items-center gap-1.5">
-              <span
-                className={cn(
-                  'inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white transition-transform',
-                  justAdded && 'animate-check-pop'
-                )}
-              >
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white">
                 <Check className="w-3 h-3" />
               </span>
               {justAdded ? 'Dodano do listy zakupów!' : 'Na liście zakupów'}
