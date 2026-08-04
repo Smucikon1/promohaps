@@ -16,7 +16,7 @@ export function StickyActionBar({ primary, extras }: { primary: ReactNode; extra
   }, [])
 
   return (
-    <div className="no-print sticky top-16 z-20 -mx-4 px-4 py-3 mb-6 bg-white/95 backdrop-blur-md border-b border-stone-100">
+    <div className="no-print sticky top-16 z-40 -mx-4 px-4 py-3 mb-6 bg-white/95 backdrop-blur-md border-b border-stone-100">
       <div className="flex flex-wrap items-center gap-3">
         {primary}
         {!scrolled && extras}
