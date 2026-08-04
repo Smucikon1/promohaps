@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ShoppingCart, RotateCcw, Check, Tag, Plus } from 'lucide-react'
 import { cn, formatPrice } from '@/lib/utils'
 import { useShoppingList } from '@/hooks/useShoppingList'
@@ -34,9 +34,15 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [] }: Shop
     return [...promos, ...regular]
   }, [ingredients, promoProducts])
 
-  // Aktualizuje istniejącą listę; NIE tworzy nowej przy samym podglądzie
+  // syncMeta wywoływane raz na mount (nie na każdy re-render defs — nowa referencja
+  // za każdym renderem parent'a powodowała setItems w loop-e nawet gdy dane były te same,
+  // co blokowało React handler-y klik).
+  const syncedRef = useRef(false)
   useEffect(() => {
-    if (loaded) syncMeta(defs)
+    if (loaded && !syncedRef.current) {
+      syncedRef.current = true
+      syncMeta(defs)
+    }
   }, [loaded, defs, syncMeta])
 
   if (!loaded) {
