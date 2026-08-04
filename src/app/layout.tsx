@@ -7,6 +7,8 @@ import { Header } from '@/components/layout/Header'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { AnalyticsBanner } from '@/components/layout/AnalyticsBanner'
 import { ServiceWorkerRegister } from '@/components/layout/ServiceWorkerRegister'
+import { NavDepthTracker } from '@/components/layout/NavDepthTracker'
+import { Analytics } from '@vercel/analytics/react'
 
 // Outfit dla całego dokumentu — tekst (--font-sans) i nagłówki (--font-serif)
 const outfitSans = Outfit({
@@ -26,15 +28,25 @@ const outfitDisplay = Outfit({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Sapri — przepisy z promocji: Biedronka, Lidl, Auchan, Carrefour, Kaufland',
-    template: '%s | Sapri',
+    default: 'Promohaps — przepisy z promocji: Biedronka, Lidl, Auchan, Carrefour, Kaufland',
+    template: '%s | Promohaps',
   },
-  description: 'Sapri — przepisy kulinarne oparte na aktualnych promocjach w Biedronce, Lidlu, Auchan, Carrefour i Kauflandzie. Gotuj taniej dzięki gazetkom promocyjnym.',
-  keywords: ['sapri', 'przepisy', 'gazetka promocyjna', 'biedronka', 'lidl', 'auchan', 'carrefour', 'kaufland', 'tanie gotowanie'],
-  openGraph: { type: 'website', locale: 'pl_PL', siteName: 'Sapri' },
+  description: 'Promohaps — przepisy kulinarne oparte na aktualnych promocjach w Biedronce, Lidlu, Auchan, Carrefour i Kauflandzie. Gotuj taniej dzięki gazetkom promocyjnym.',
+  keywords: ['promohaps', 'przepisy z gazetki', 'gazetka promocyjna', 'biedronka', 'lidl', 'auchan', 'carrefour', 'kaufland', 'dino', 'netto', 'tanie gotowanie', 'oszczędne przepisy'],
+  openGraph: {
+    type: 'website',
+    locale: 'pl_PL',
+    siteName: 'Promohaps',
+    // Obraz OG generowany dynamicznie przez src/app/opengraph-image.tsx (Next konwencja).
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Promohaps — przepisy z gazetek promocyjnych',
+    description: 'Gotuj taniej dzięki aktualnym promocjom Biedronki, Lidla, Kauflanda, Auchan i Carrefour.',
+  },
   robots: { index: true, follow: true },
-  applicationName: 'Sapri',
-  appleWebApp: { capable: true, title: 'Sapri', statusBarStyle: 'default' },
+  applicationName: 'Promohaps',
+  appleWebApp: { capable: true, title: 'Promohaps', statusBarStyle: 'default' },
   icons: {
     icon: '/icon.svg',
     apple: '/icon.svg',
@@ -42,7 +54,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#f59e0b',
+  themeColor: '#12b76a',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -50,18 +62,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pl" className={`${outfitSans.variable} ${outfitDisplay.variable}`}>
       <body>
         <ServiceWorkerRegister />
+        <NavDepthTracker />
         <Header />
         <main className="min-h-screen pb-20 md:pb-0">{children}</main>
         <BottomNav />
         <AnalyticsBanner />
+        <Analytics />
         <footer className="hidden md:block bg-white border-t border-stone-100 py-8 mt-16">
           <div className="max-w-6xl mx-auto px-4 text-center text-stone-500 text-sm">
-            <p>© {new Date().getFullYear()} Sapri</p>
+            <p>© {new Date().getFullYear()} Promohaps</p>
             <p className="mt-1">Przepisy tworzone na podstawie aktualnych gazetek promocyjnych</p>
             <p className="mt-3 flex items-center justify-center gap-4">
               <Link href="/polityka-prywatnosci" className="hover:text-stone-600 transition-colors">Polityka prywatności</Link>
               <Link href="/regulamin" className="hover:text-stone-600 transition-colors">Regulamin</Link>
               <Link href="/reklama" className="hover:text-stone-600 transition-colors">Reklama</Link>
+            </p>
+            <p className="mt-4 text-xs text-stone-400 max-w-2xl mx-auto">
+              Nazwy i logotypy sieci handlowych są znakami towarowymi ich właścicieli i służą wyłącznie
+              celom informacyjnym. Promohaps nie jest powiązany ani sponsorowany przez te sieci.
             </p>
           </div>
         </footer>

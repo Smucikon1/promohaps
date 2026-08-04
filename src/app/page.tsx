@@ -1,15 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeFilters } from '@/components/recipe/RecipeFilters'
-import { SearchBar } from '@/components/recipe/SearchBar'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
-import { CategoryIcon } from '@/components/recipe/CategoryIcon'
+import { FeaturedRecipe } from '@/components/recipe/FeaturedRecipe'
+import { FilterTransitionProvider, ResultsPending } from '@/components/recipe/FilterTransition'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
-import { fetchRecipes, storeRecipeCounts } from '@/lib/recipeQuery'
-import { COLLECTIONS } from '@/lib/collections'
-import { storeColor } from '@/lib/stores'
+import { dedupeRecipes } from '@/lib/recipeDedupe'
+import { hasActivePromo } from '@/lib/utils'
+import { favoriteCounts } from '@/lib/favoriteCounts'
+import { cachedStores, cachedCategories, cachedCheapest } from '@/lib/catalog'
 import { AdSlot } from '@/components/ads/AdSlot'
-import { Flame, Store as StoreIcon, LayoutGrid, CalendarDays } from 'lucide-react'
+import { Flame, PiggyBank } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Store, Category } from '@/types'
@@ -18,7 +19,7 @@ const PAGE_SIZE = 12
 
 type SearchParams = {
   store?: string; category?: string; difficulty?: string; search?: string
-  limit?: string; sort?: string; maxPrice?: string
+  limit?: string; sort?: string; maxPrice?: string; airfryer?: string
 }
 
 interface HomeProps {
@@ -47,29 +48,52 @@ function GridSkeleton() {
   )
 }
 
-function PlanBanner() {
+function FeaturedSkeleton() {
   return (
-    <Link href="/plan" className="flex items-center gap-4 rounded-2xl p-5 mb-10 transition-colors hover:brightness-[0.98]" style={{ background: '#e8f3ff' }}>
-      <div className="w-11 h-11 rounded-xl bg-[#1595ff] text-white flex items-center justify-center flex-shrink-0">
-        <CalendarDays className="w-6 h-6" />
+    <div className="mb-10 grid md:grid-cols-2 overflow-hidden rounded-3xl border border-stone-100 bg-white" aria-hidden="true">
+      <div className="aspect-[16/10] md:aspect-auto md:min-h-[340px] bg-stone-100 animate-pulse" />
+      <div className="p-6 md:p-9 space-y-4">
+        <div className="h-5 w-32 rounded-full bg-stone-100 animate-pulse" />
+        <div className="h-9 w-3/4 rounded bg-stone-100 animate-pulse" />
+        <div className="h-4 w-full rounded bg-stone-100 animate-pulse" />
+        <div className="h-12 w-40 rounded bg-stone-100 animate-pulse" />
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-bold text-stone-900">Zaplanuj tydzień → gotowa lista zakupów</div>
-        <div className="text-sm text-stone-600">Jedno opakowanie na kilka dań, koszt dzielony między przepisy.</div>
-      </div>
-      <span className="hidden sm:inline-flex btn-primary flex-shrink-0">Zacznij</span>
-    </Link>
+    </div>
   )
 }
 
+// Rezerwuje wysokość sekcji, żeby treść nie doskakiwała po dociągnięciu danych.
+function SectionSkeleton({ height }: { height: number }) {
+  return (
+    <div className="mb-10" aria-hidden="true">
+      <div className="h-6 w-56 rounded bg-stone-100 animate-pulse mb-4" />
+      <div className="rounded-2xl bg-stone-50 animate-pulse" style={{ height }} />
+    </div>
+  )
+}
+
+
+// Afisz i „Najtańsze” dzielą jedno cache'owane zapytanie.
+async function pickFeatured() {
+  const all = await cachedCheapest()
+  return all.find((r: any) => r.image_url) ?? all[0] ?? null
+}
+
+async function FeaturedSection() {
+  const recipe = await pickFeatured()
+  if (!recipe) return null
+  return <FeaturedRecipe recipe={recipe} />
+}
+
 async function CheapestSection() {
-  const supabase = await createClient()
-  const { recipes } = await fetchRecipes(supabase, { sort: 'cheap', limit: 6 })
+  const [all, featured] = await Promise.all([cachedCheapest(), pickFeatured()])
+  // Bez powtórki przepisu, który wisi już na afiszu wyżej
+  const recipes = all.filter((r: any) => r.id !== featured?.id).slice(0, 6)
   if (recipes.length === 0) return null
   return (
     <section className="mb-10">
       <div className="flex items-center gap-2 mb-4">
-        <Flame className="w-5 h-5 text-[#1595ff]" />
+        <Flame className="w-5 h-5 text-[#12b76a]" />
         <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>Najtańsze w tym tygodniu</h2>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -79,60 +103,13 @@ async function CheapestSection() {
   )
 }
 
-async function StoreTiles({ stores }: { stores: Store[] }) {
-  const supabase = await createClient()
-  const counts = await storeRecipeCounts(supabase)
-  return (
-    <section className="mb-10">
-      <div className="flex items-center gap-2 mb-4">
-        <StoreIcon className="w-5 h-5 text-[#1595ff]" />
-        <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>Promocje wg sklepu</h2>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {stores.map((s) => {
-          const n = counts.get(s.id) ?? 0
-          const color = s.color ?? storeColor(s.slug)
-          return (
-            <Link key={s.id} href={`/sklep/${s.slug}`} className="flex items-center gap-3 bg-white rounded-2xl border border-stone-100 p-4 hover:border-stone-300 transition-colors">
-              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-              <div className="min-w-0">
-                <div className="font-semibold text-stone-800 text-sm truncate">{s.name}</div>
-                <div className="text-xs text-stone-400">{pluralPrzepis(n)}</div>
-              </div>
-            </Link>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-function CollectionsSection() {
-  return (
-    <section className="mb-10">
-      <div className="flex items-center gap-2 mb-4">
-        <LayoutGrid className="w-5 h-5 text-[#1595ff]" />
-        <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>Kolekcje</h2>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {COLLECTIONS.map((c) => (
-          <Link key={c.slug} href={`/kolekcja/${c.slug}`} className="bg-white rounded-2xl border border-stone-100 p-4 hover:border-[#1595ff] transition-colors">
-            <div className="font-semibold text-stone-800">{c.title}</div>
-            <div className="text-xs text-stone-500 mt-0.5 line-clamp-2">{c.description}</div>
-          </Link>
-        ))}
-      </div>
-    </section>
-  )
-}
-
 async function Results({ params, stores, categories }: { params: SearchParams; stores: Store[]; categories: Category[] }) {
   const supabase = await createClient()
-  const hidden = await expiredRecipeIds(supabase)
+  const hidden = await expiredRecipeIds()
 
   const parsedLimit = parseInt(params.limit ?? '', 10)
   const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 120) : PAGE_SIZE
-  const sort = params.sort ?? 'new'
+  const sort = params.sort ?? 'cheap'
   const maxPrice = params.maxPrice ? parseInt(params.maxPrice, 10) : undefined
   const noMatch = ['00000000-0000-0000-0000-000000000000']
 
@@ -140,6 +117,8 @@ async function Results({ params, stores, categories }: { params: SearchParams; s
     .from('recipes')
     .select(`*, store:stores(*), categories:recipe_categories(category:categories(*)), promo_products(*)`, { count: 'exact' })
     .eq('is_published', true)
+    // Bez ceny przepis nie ma sensu w tej aplikacji — nie pokazujemy niedokończonych
+    .gt('price_total', 0)
 
   if (hidden.length > 0) query = query.not('id', 'in', `(${hidden.join(',')})`)
 
@@ -149,8 +128,10 @@ async function Results({ params, stores, categories }: { params: SearchParams; s
 
   if (maxPrice) query = query.lte('price_total', maxPrice)
   if (params.store) {
-    const store = stores.find((s) => s.slug === params.store)
-    if (store) query = query.eq('store_id', store.id)
+    const wanted = new Set(params.store.split(',').filter(Boolean))
+    const ids = stores.filter((s) => wanted.has(s.slug)).map((s) => s.id)
+    if (ids.length > 0) query = query.in('store_id', ids)
+    else query = query.in('id', noMatch)
   }
   if (params.difficulty) query = query.eq('difficulty', params.difficulty)
 
@@ -176,17 +157,46 @@ async function Results({ params, stores, categories }: { params: SearchParams; s
     }
   }
 
-  const { data: rawRecipes, count } = await query.range(0, limit - 1)
-  const recipes = (rawRecipes ?? []).map((r: any) => ({
-    ...r,
-    categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
-  }))
+  // Filtr „Airfryer”: przepisy wspominające airfryer / frytkownicę beztłuszczową
+  // w tytule, opisie albo krokach. Działa automatycznie, gdy AI wygeneruje takie dania.
+  if (params.airfryer) {
+    const { data: stepMatch } = await supabase
+      .from('recipe_steps')
+      .select('recipe_id')
+      .or('description.ilike.%airfr%,description.ilike.%air fry%,description.ilike.%frytkownic%,description.ilike.%beztłuszcz%')
+    const stepIds = Array.from(new Set((stepMatch ?? []).map((r: any) => r.recipe_id).filter(Boolean)))
+    const orParts = [
+      'title.ilike.%airfr%',
+      'title.ilike.%frytkownic%',
+      'description.ilike.%airfr%',
+      'description.ilike.%frytkownic%',
+      'description.ilike.%beztłuszcz%',
+    ]
+    if (stepIds.length > 0) orParts.push(`id.in.(${stepIds.join(',')})`)
+    query = query.or(orParts.join(','))
+  }
 
-  const total = count ?? recipes.length
+  const [{ data: rawRecipes, count }, favEntries] = await Promise.all([
+    query.range(0, limit - 1),
+    favoriteCounts(),
+  ])
+  const favCounts = new Map(favEntries)
+  const mapped = (rawRecipes ?? [])
+    // Rdzeń serwisu: pokazujemy tylko przepisy z trwającą promocją
+    .filter((r: any) => hasActivePromo(r.promo_products))
+    .map((r: any) => ({
+      ...r,
+      categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
+      favorite_count: favCounts.get(r.id) ?? 0,
+    }))
+  // To samo danie w kilku wariantach tytułu pokazujemy raz
+  const recipes = dedupeRecipes(mapped)
+
+  const total = Math.max(0, (count ?? mapped.length) - (mapped.length - recipes.length))
   const hasMore = recipes.length < total
 
   const moreParams = new URLSearchParams()
-  for (const k of ['store', 'category', 'difficulty', 'search', 'sort', 'maxPrice'] as const) {
+  for (const k of ['store', 'category', 'difficulty', 'search', 'sort', 'maxPrice', 'airfryer'] as const) {
     if (params[k]) moreParams.set(k, params[k]!)
   }
   moreParams.set('limit', String(limit + PAGE_SIZE))
@@ -228,79 +238,56 @@ async function Results({ params, stores, categories }: { params: SearchParams; s
 
 export default async function HomePage({ searchParams }: HomeProps) {
   const params = await searchParams
-  const supabase = await createClient()
-
-  const [{ data: stores }, { data: categories }] = await Promise.all([
-    supabase.from('stores').select('*').eq('is_active', true).order('sort_order'),
-    supabase.from('categories').select('*').eq('is_active', true).order('sort_order'),
-  ])
-
-  const noFilters =
-    !params.store && !params.category && !params.difficulty && !params.search &&
-    !params.sort && !params.maxPrice && !params.limit
-
-  const resultsKey = `${params.store ?? ''}|${params.category ?? ''}|${params.difficulty ?? ''}|${params.search ?? ''}|${params.sort ?? ''}|${params.maxPrice ?? ''}|${params.limit ?? ''}`
+  // Sklepy i kategorie nie zależą od filtrów — lecą z cache, nie z bazy przy każdym kliknięciu
+  const [stores, categories] = await Promise.all([cachedStores(), cachedCategories()])
 
   return (
     <div>
-      {/* Hero: wyszukiwarka + szybkie chipy cenowe */}
-      <section style={{ background: 'linear-gradient(135deg, #e8f3ff 0%, #d0e8ff 50%, #faf9f6 100%)' }} className="py-6">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="max-w-2xl">
-            <Suspense>
-              <SearchBar />
-            </Suspense>
-          </div>
-        </div>
-      </section>
-
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Sekcje kuratorskie — tylko na widoku domyślnym */}
-        {noFilters && (
-          <>
-            <PlanBanner />
-            <Suspense><CheapestSection /></Suspense>
-            <Suspense><StoreTiles stores={stores ?? []} /></Suspense>
-            <CollectionsSection />
-          </>
-        )}
+        {/* Hero: badge + nagłówek. Logo Promohaps jest już w topbarze (Header). */}
+        <header className="relative mb-6 px-1 py-5 md:py-8">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e6f9f0] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#12b76a]">
+            <PiggyBank className="w-3.5 h-3.5" />
+            Przepisy gazetkowe
+          </span>
+          <h1 className="mt-3 text-2xl font-bold leading-tight text-stone-900 md:text-4xl md:max-w-3xl" style={{ fontFamily: 'var(--font-serif)' }}>
+            Oszczędzaj, gotując <span className="text-[#12b76a]">z gazetek promocyjnych</span>
+          </h1>
+        </header>
 
-        {/* Filtry */}
-        <Suspense>
-          <div className="mb-8 bg-white/95 backdrop-blur rounded-2xl p-5 border border-stone-100 md:sticky md:top-16 md:z-30">
-            <RecipeFilters stores={stores ?? []} categories={categories ?? []} />
-          </div>
-        </Suspense>
+        {/* Filtry i wyniki dzielą jeden stan przejścia: klik od razu przygasza
+            siatkę i pokazuje spinner, zamiast zostawiać stronę bez reakcji. */}
+        <FilterTransitionProvider>
+          {/* Sklepy i filtry na samej górze — jako główna nawigacja, nad afiszem */}
+          <Suspense>
+            <div className="mb-8 bg-white rounded-2xl p-5 border border-stone-100 md:sticky md:top-16 md:z-40">
+              <RecipeFilters stores={stores ?? []} categories={categories ?? []} />
+            </div>
+          </Suspense>
 
-        {noFilters && (
-          <h2 className="text-xl font-bold text-stone-900 mb-5" style={{ fontFamily: 'var(--font-serif)' }}>Wszystkie przepisy</h2>
-        )}
+          {/* Przepis tygodnia pod filtrami */}
+          <Suspense fallback={<FeaturedSkeleton />}>
+            <FeaturedSection />
+          </Suspense>
 
-        {/* Wyniki */}
-        <Suspense key={resultsKey} fallback={<GridSkeleton />}>
-          <Results params={params} stores={stores ?? []} categories={categories ?? []} />
-        </Suspense>
+          <h2 className="text-xl font-bold text-stone-900 mb-5" style={{ fontFamily: 'var(--font-serif)' }}>Przepisy z promocji</h2>
+
+          {/* Bez key: React trzyma poprzednią siatkę do czasu gotowości nowej,
+              więc nic nie mruga szkieletem przy każdym kliknięciu. */}
+          <ResultsPending>
+            <Suspense fallback={<GridSkeleton />}>
+              <Results params={params} stores={stores ?? []} categories={categories ?? []} />
+            </Suspense>
+          </ResultsPending>
+        </FilterTransitionProvider>
 
         <AdSlot className="mt-10" />
 
-        {/* Linki SEO — kategorie i kolekcje */}
-        <section className="mt-14 pt-8 border-t border-stone-100">
-          <h2 className="text-lg font-bold text-stone-800 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>Przepisy według kategorii</h2>
-          <div className="flex flex-wrap gap-2 mb-6">
-            {(categories ?? []).map((c) => (
-              <Link key={c.id} href={`/kategoria/${c.slug}`} className="category-pill">
-                <CategoryIcon slug={c.slug} className="w-3.5 h-3.5 text-[#1595ff]" />
-                {c.name}
-              </Link>
-            ))}
-          </div>
-          <h2 className="text-lg font-bold text-stone-800 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>Kolekcje</h2>
-          <div className="flex flex-wrap gap-2">
-            {COLLECTIONS.map((c) => (
-              <Link key={c.slug} href={`/kolekcja/${c.slug}`} className="category-pill">{c.title}</Link>
-            ))}
-          </div>
-        </section>
+        {/* Najtańsze — jedyna sekcja stała pod siatką. Kolekcje i linki kategorii
+            usunięte: kategorie są już w filtrach, więc dublowały nawigację. */}
+        <div className="mt-14">
+          <Suspense fallback={<SectionSkeleton height={320} />}><CheapestSection /></Suspense>
+        </div>
 
         <RecentlyViewed />
       </div>

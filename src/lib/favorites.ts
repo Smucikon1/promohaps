@@ -43,6 +43,14 @@ export function removeFavorite(id: string) {
   writeFavorites(readFavorites().filter((f) => f.id !== id))
 }
 
+// Usuwa z ulubionych to, czego nie ma w zbiorze `valid` (przeterminowane/wyłączone/usunięte).
+// Zapisuje tylko gdy coś się zmieniło, żeby nie emitować zbędnych eventów.
+export function pruneFavorites(valid: Set<string>) {
+  const list = readFavorites()
+  const kept = list.filter((f) => valid.has(f.id))
+  if (kept.length !== list.length) writeFavorites(kept)
+}
+
 export function countFavorites(): number {
   return readFavorites().length
 }

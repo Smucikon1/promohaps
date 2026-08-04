@@ -1,9 +1,14 @@
 import { isPromoActive } from '@/lib/utils'
 import type { PromoProduct } from '@/types'
 
-// Zwraca tylko aktualnie obowiązujące promocje
+// Poniżej tej ceny promocja jest niewiarygodna (błąd odczytu) — nie pokazujemy jej
+export const MIN_PLAUSIBLE_PRICE = 0.3
+
+// Zwraca tylko aktualnie obowiązujące i wiarygodne cenowo promocje
 export function activePromos(promos?: PromoProduct[] | null): PromoProduct[] {
-  return (promos ?? []).filter((p) => isPromoActive(p.valid_from, p.valid_to))
+  return (promos ?? []).filter(
+    (p) => isPromoActive(p.valid_from, p.valid_to) && (p.price_promo ?? 0) >= MIN_PLAUSIBLE_PRICE
+  )
 }
 
 // Łączna oszczędność = suma (cena regularna − cena promocyjna) po aktywnych promocjach

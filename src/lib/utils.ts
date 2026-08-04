@@ -55,6 +55,13 @@ export function isPromoExpired(validTo: string): boolean {
   return promoEnd(validTo) < new Date()
 }
 
+// Rdzeń serwisu: przepis „z gazetki" musi mieć CO NAJMNIEJ JEDNĄ trwającą promocję.
+// Brak promocji = przepis nie jest już powiązany z żadną gazetką i nie powinien
+// trafiać do użytkownika (sama wygasła promocja to osobna, wcześniejsza reguła).
+export function hasActivePromo(promos?: { valid_to?: string | null }[] | null): boolean {
+  return (promos ?? []).some((p) => !p.valid_to || !isPromoExpired(p.valid_to))
+}
+
 // Pełne dni do końca promocji: 0 = ostatni dzień, 1 = do jutra itd.
 export function promoDaysLeft(validTo: string): number {
   return Math.max(0, Math.floor((promoEnd(validTo).getTime() - Date.now()) / 86_400_000))

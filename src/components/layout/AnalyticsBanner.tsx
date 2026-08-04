@@ -25,8 +25,10 @@ export function AnalyticsBanner() {
   if (!visible) return null
 
   return (
-    <div className="no-print fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:max-w-sm z-50">
-      <div className="bg-stone-800 text-white rounded-2xl p-4 shadow-xl">
+    // Kontener przepuszcza kliknięcia (pointer-events-none) — blokuje tylko sama karta,
+    // żeby baner nie zasłaniał przycisków strony pod sobą.
+    <div className="no-print pointer-events-none fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:max-w-sm z-50">
+      <div className="pointer-events-auto bg-stone-800 text-white rounded-2xl p-4 shadow-xl">
         <div className="flex items-start gap-3">
           <span className="text-lg">🍪</span>
           <div className="flex-1 min-w-0">

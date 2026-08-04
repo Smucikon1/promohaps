@@ -1,5 +1,6 @@
 'use client'
 
+import { revalidateCatalog } from '@/app/actions/revalidate'
 import { useState } from 'react'
 import { Trash2, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -19,6 +20,7 @@ export function DeleteRecipeButton({ id, title }: Props) {
     setLoading(true)
     const supabase = createClient()
     await supabase.from('recipes').delete().eq('id', id)
+    await revalidateCatalog()
     router.refresh()
   }
 

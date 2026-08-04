@@ -1,5 +1,6 @@
 'use client'
 
+import { revalidateCatalog } from '@/app/actions/revalidate'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -21,6 +22,7 @@ export function PublishToggle({ id, isPublished }: { id: string; isPublished: bo
       setLoading(false)
       return
     }
+    await revalidateCatalog()
     router.refresh()
     setLoading(false)
   }

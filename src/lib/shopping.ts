@@ -18,6 +18,8 @@ export interface ShoppingItem {
   priceRegular?: number | null
   // true dla produktów z gazetki (cena stała); false dla składników (cena skaluje się z porcjami)
   fixedPrice?: boolean
+  // Ile przepisów na liście używa tego samego produktu (kupujesz go raz)
+  sharedCount?: number
   // Warunek promocji z gazetki (np. cena tylko z kartą, oferta 2+1)
   conditionType?: string | null
   conditionNote?: string | null

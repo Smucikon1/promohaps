@@ -30,7 +30,7 @@ export function AdminNav() {
       <div className="p-5 border-b border-stone-50">
         <Link href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Sapri" className="h-6 w-auto" />
+          <img src="/logo.svg" alt="Promohaps" className="h-6 w-auto" />
         </Link>
         <p className="text-xs text-stone-400 mt-1">Panel admina</p>
       </div>

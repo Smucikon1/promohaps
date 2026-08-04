@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ShoppingCart, RotateCcw, Check, Tag, Plus } from 'lucide-react'
 import { cn, formatPrice } from '@/lib/utils'
 import { useShoppingList } from '@/hooks/useShoppingList'
@@ -16,6 +16,7 @@ interface ShoppingListProps {
 export function ShoppingList({ recipeId, ingredients, promoProducts = [] }: ShoppingListProps) {
   const { items, loaded, exists, addAll, removeAll, syncMeta, toggleItem, resetList, checkedCount } =
     useShoppingList(recipeId)
+  const [justAdded, setJustAdded] = useState(false)
 
   // Definicja składników: produkty z gazetki (wyróżnione) + zwykłe składniki
   const defs = useMemo<Omit<ShoppingItem, 'checked'>[]>(() => {
@@ -128,28 +129,6 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [] }: Shop
         )}
       </div>
 
-      {/* Akcja: dodaj / status na liście */}
-      {total > 0 && (
-        exists ? (
-          <div className="px-5 py-3 border-b border-stone-50 flex items-center justify-between bg-green-50/50">
-            <span className="text-sm font-medium text-green-700 inline-flex items-center gap-1.5">
-              <Check className="w-4 h-4" />
-              Na liście zakupów
-            </span>
-            <button onClick={removeAll} className="text-xs text-stone-500 hover:text-red-500 transition-colors">
-              Usuń z listy
-            </button>
-          </div>
-        ) : (
-          <div className="px-5 py-4 border-b border-stone-50">
-            <button onClick={() => addAll(defs)} className="w-full btn-primary flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4" />
-              Dodaj do listy zakupów
-            </button>
-          </div>
-        )
-      )}
-
       {/* Pasek postępu (tylko gdy na liście) */}
       {exists && total > 0 && (
         <div className="h-1 bg-stone-50">
@@ -202,6 +181,50 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [] }: Shop
           <span className="text-sm font-semibold text-stone-700">Razem</span>
           <span className="text-lg font-bold text-amber-600">{formatPrice(totalPrice)}</span>
         </div>
+      )}
+
+      {/* Akcja: dodaj / status na liście — z mikroanimacją i komunikatem po dodaniu */}
+      {total > 0 && (
+        exists ? (
+          <div
+            className={cn(
+              'px-5 py-3 border-t border-stone-100 flex items-center justify-between bg-green-50/50 transition-all',
+              justAdded && 'animate-pop-in'
+            )}
+          >
+            <span className="text-sm font-medium text-green-700 inline-flex items-center gap-1.5">
+              <span
+                className={cn(
+                  'inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white transition-transform',
+                  justAdded && 'animate-check-pop'
+                )}
+              >
+                <Check className="w-3 h-3" />
+              </span>
+              {justAdded ? 'Dodano do listy zakupów!' : 'Na liście zakupów'}
+            </span>
+            <button
+              onClick={removeAll}
+              className="text-xs text-stone-500 hover:text-red-500 transition-colors"
+            >
+              Usuń z listy
+            </button>
+          </div>
+        ) : (
+          <div className="px-5 py-4 border-t border-stone-100">
+            <button
+              onClick={() => {
+                addAll(defs)
+                setJustAdded(true)
+                setTimeout(() => setJustAdded(false), 1800)
+              }}
+              className="w-full btn-primary flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            >
+              <Plus className="w-4 h-4" />
+              Dodaj do listy zakupów
+            </button>
+          </div>
+        )
       )}
 
       {exists && progress === 100 && (

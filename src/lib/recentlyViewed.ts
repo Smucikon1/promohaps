@@ -23,6 +23,14 @@ export function readRecent(): RecentRecipe[] {
   }
 }
 
+// Usuwa z historii przepisy, których już nie ma (usunięte, ukryte, bez ceny).
+// Bez emitowania zdarzenia — inaczej powstałaby pętla odświeżeń.
+export function pruneRecent(validIds: Set<string>) {
+  if (typeof window === 'undefined') return
+  const kept = readRecent().filter((r) => validIds.has(r.id))
+  localStorage.setItem(RECENT_KEY, JSON.stringify(kept))
+}
+
 export function recordView(r: RecentRecipe) {
   if (typeof window === 'undefined') return
   const list = readRecent().filter((x) => x.id !== r.id)

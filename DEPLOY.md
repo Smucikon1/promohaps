@@ -58,3 +58,15 @@ Kolejność ma znaczenie: najpierw zabezpiecz bazę, potem wdróż.
 ## 8. Po starcie
 - [ ] Google Search Console → dodaj domenę, prześlij `/sitemap.xml`.
 - [ ] Sprawdź: logowanie admina, upload zdjęcia, odczyt gazetki, publikacja przepisu.
+- [ ] Sprawdź, że karta OG działa: wklej link do https://www.opengraph.xyz albo zrób post testowy na LinkedIn/FB.
+
+## 9. Rzeczy dołożone tuż przed startem (weryfikacja po deployu)
+- [ ] `src/app/loading.tsx` — pełnoekranowy szkielet home; sprawdź, że nie widać białego błysku między klikiem a renderem.
+- [ ] `src/app/przepis/[slug]/loading.tsx` — szkielet przepisu.
+- [ ] `src/app/error.tsx` — boundary; przetestuj wyłączając Supabase (chwilowo złe klucze), powinien wyświetlić „Coś poszło nie tak" z przyciskiem „Spróbuj ponownie".
+- [ ] `public/og.svg` + `openGraph.images` w `layout.tsx` — placeholder marki. **Docelowo podmień na PNG 1200×630** (WhatsApp/Slack ignorują SVG).
+- [ ] `sitemap.ts` — teraz odsiewa przepisy bez trwającej promocji (nie tylko wygasłe). Sprawdź, że `/sitemap.xml` zawiera tylko rzeczy, które user faktycznie zobaczy.
+
+## 10. Ryzyka do rotacji przed publiczną promocją
+- [ ] `service_role` w Supabase — Rotate (patrz sekcja 1).
+- [ ] `ANTHROPIC_API_KEY` — obrócić w console.anthropic.com (były wklejone w rozmowach; nowy wpisz w Vercel jako Env Var).

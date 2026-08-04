@@ -5,7 +5,8 @@ import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
-import { isPromoExpired } from '@/lib/utils'
+import { hasActivePromo } from '@/lib/utils'
+import { dedupeRecipes } from '@/lib/recipeDedupe'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -45,18 +46,21 @@ export default async function CategoryPage({ params }: Props) {
         .from('recipes')
         .select(`*, store:stores(*), categories:recipe_categories(category:categories(*)), promo_products(*)`)
         .eq('is_published', true)
+        .gt('price_total', 0)
         .in('id', ids)
         .order('created_at', { ascending: false })
         .limit(48)
     : { data: [] as any[] }
 
-  const recipes = (rawRecipes ?? [])
-    // Przepisy z wygasłą promocją znikają
-    .filter((r: any) => !(r.promo_products ?? []).some((p: any) => isPromoExpired(p.valid_to)))
-    .map((r: any) => ({
-      ...r,
-      categories: r.categories?.map((rc2: any) => rc2.category).filter(Boolean) ?? [],
-    }))
+  const recipes = dedupeRecipes(
+    (rawRecipes ?? [])
+      // Tylko przepisy z trwającą promocją (wygasłe i te bez gazetki znikają)
+      .filter((r: any) => hasActivePromo(r.promo_products))
+      .map((r: any) => ({
+        ...r,
+        categories: r.categories?.map((rc2: any) => rc2.category).filter(Boolean) ?? [],
+      }))
+  )
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -65,7 +69,7 @@ export default async function CategoryPage({ params }: Props) {
       </Link>
 
       <h1 className="flex items-center gap-2.5 text-3xl md:text-4xl font-bold text-stone-900 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>
-        <CategoryIcon slug={cat.slug} className="w-7 h-7 text-[#1595ff]" />
+        <CategoryIcon slug={cat.slug} className="w-7 h-7 text-[#12b76a]" />
         {cat.name}
       </h1>
       <p className="text-stone-600 mb-8 max-w-2xl">

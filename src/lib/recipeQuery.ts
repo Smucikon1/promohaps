@@ -1,4 +1,7 @@
 import { expiredRecipeIds } from '@/lib/promoVisibility'
+import { dedupeRecipes } from '@/lib/recipeDedupe'
+import { hasActivePromo } from '@/lib/utils'
+import { favoriteCounts } from '@/lib/favoriteCounts'
 
 const NO_MATCH = ['00000000-0000-0000-0000-000000000000']
 
@@ -14,7 +17,7 @@ export interface RecipeCriteria {
 
 // Wspólne pobieranie przepisów: opublikowane, bez wygasłych promocji, wg kryteriów.
 export async function fetchRecipes(supabase: any, c: RecipeCriteria = {}) {
-  const hidden = await expiredRecipeIds(supabase)
+  const hidden = await expiredRecipeIds()
 
   let query = supabase
     .from('recipes')
@@ -23,6 +26,8 @@ export async function fetchRecipes(supabase: any, c: RecipeCriteria = {}) {
       { count: 'exact' }
     )
     .eq('is_published', true)
+    // Bez ceny przepis nie ma sensu w tej aplikacji — nie pokazujemy niedokończonych
+    .gt('price_total', 0)
 
   if (hidden.length > 0) query = query.not('id', 'in', `(${hidden.join(',')})`)
 
@@ -51,22 +56,22 @@ export async function fetchRecipes(supabase: any, c: RecipeCriteria = {}) {
   }
 
   const lim = c.limit ?? 12
-  const { data, count } = await query.range(0, lim - 1)
-  const recipes = (data ?? []).map((r: any) => ({
-    ...r,
-    categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
-  }))
-  return { recipes, total: count ?? recipes.length }
+  const [{ data, count }, favEntries] = await Promise.all([
+    query.range(0, lim - 1),
+    favoriteCounts(),
+  ])
+  const favCounts = new Map(favEntries)
+  const mapped = (data ?? [])
+    // Rdzeń serwisu: pokazujemy tylko przepisy z trwającą promocją
+    .filter((r: any) => hasActivePromo(r.promo_products))
+    .map((r: any) => ({
+      ...r,
+      categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
+      favorite_count: favCounts.get(r.id) ?? 0,
+    }))
+  // To samo danie w kilku wariantach tytułu pokazujemy raz
+  const recipes = dedupeRecipes(mapped)
+  const removed = mapped.length - recipes.length
+  return { recipes, total: Math.max(0, (count ?? mapped.length) - removed) }
 }
 
-// Liczba opublikowanych (nie wygasłych) przepisów per sklep
-export async function storeRecipeCounts(supabase: any): Promise<Map<string, number>> {
-  const hidden = new Set(await expiredRecipeIds(supabase))
-  const { data } = await supabase.from('recipes').select('id, store_id').eq('is_published', true)
-  const counts = new Map<string, number>()
-  for (const r of data ?? []) {
-    if (!r.store_id || hidden.has(r.id)) continue
-    counts.set(r.store_id, (counts.get(r.store_id) ?? 0) + 1)
-  }
-  return counts
-}

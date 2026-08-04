@@ -36,6 +36,8 @@ export interface Recipe {
   views_count: number
   created_at: string
   updated_at: string
+  // wyliczane: ile razy przepis dodano do ulubionych (z analytics_events)
+  favorite_count?: number
   // joined
   store?: Store
   categories?: Category[]

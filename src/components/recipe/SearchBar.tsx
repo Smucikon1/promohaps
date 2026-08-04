@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useTransition } from 'react'
 import { Search, X, Loader2 } from 'lucide-react'
 import { track } from '@/lib/analytics'
 
-export function SearchBar() {
+export function SearchBar({ onSubmitted }: { onSubmitted?: () => void } = {}) {
   const router = useRouter()
   const params = useSearchParams()
   const [value, setValue] = useState(params.get('search') ?? '')
@@ -48,6 +48,7 @@ export function SearchBar() {
       onSubmit={(e) => {
         e.preventDefault()
         submit(value)
+        onSubmitted?.()
       }}
       className="relative"
     >

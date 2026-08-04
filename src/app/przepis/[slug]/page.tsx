@@ -3,18 +3,21 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Clock, Flame, ShoppingBag, ArrowLeft } from 'lucide-react'
-import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, isPromoExpired, promoDaysLeft } from '@/lib/utils'
+import { Clock, Flame, ShoppingBag, ArrowLeft, PiggyBank, Users } from 'lucide-react'
+import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, isPromoExpired, promoDaysLeft, hasActivePromo } from '@/lib/utils'
+import { totalSavings } from '@/lib/savings'
 import { storeColor } from '@/lib/stores'
 import { ShoppingList } from '@/components/recipe/ShoppingList'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { RecipeActions } from '@/components/recipe/RecipeActions'
-import { AddToPlan } from '@/components/recipe/AddToPlan'
+import { StickyActionBar } from '@/components/recipe/StickyActionBar'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { RecipeTracker } from '@/components/recipe/RecipeTracker'
 import { RecordView } from '@/components/recipe/RecordView'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
+import { BackLink } from '@/components/layout/BackLink'
+import { dedupeRecipes, dishFingerprint } from '@/lib/recipeDedupe'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -75,37 +78,26 @@ export default async function RecipePage({ params }: Props) {
       ? null
       : daysLeft === 0 ? 'kończy się dziś' : daysLeft === 1 ? 'kończy się jutro' : `kończy się za ${daysLeft} dni`
   const needsCard = activePromos.some((p: any) => p.condition_type === 'karta')
-
-  // Dane do jadłospisu (składniki + promocje potrzebne do listy zakupów)
-  const plannedRecipe = {
-    id: normalized.id,
-    slug: normalized.slug,
-    title: normalized.title,
-    image_url: normalized.image_url,
-    store_name: normalized.store?.name ?? null,
-    price_total: normalized.price_total,
-    savings: 0,
-    ingredients: normalized.ingredients.map((i: any) => ({
-      id: i.id, name: i.name, amount: i.amount, unit: i.unit, price: i.price ?? null, isPromo: !!i.is_promo_product,
-    })),
-    promos: activePromos.map((p: any) => ({
-      id: p.id, name: p.name, price_promo: p.price_promo, price_regular: p.price_regular,
-    })),
-  }
+  const savings = totalSavings(normalized.promo_products)
 
   // Powiązane przepisy z tego samego sklepu
   const { data: relatedRaw } = await supabase
     .from('recipes')
     .select('*, store:stores(*), promo_products(*)')
     .eq('is_published', true)
+    // Bez ceny przepis nie ma sensu w tej aplikacji — nie pokazujemy niedokończonych
+    .gt('price_total', 0)
     .eq('store_id', normalized.store_id)
     .neq('id', normalized.id)
     .order('created_at', { ascending: false })
     .limit(6)
-  // Powiązane też znikają, gdy mają wygasłą promocję
-  const related = (relatedRaw ?? [])
-    .filter((r: any) => !(r.promo_products ?? []).some((p: any) => isPromoExpired(p.valid_to)))
-    .slice(0, 3)
+  // Powiązane: bez wygasłych promocji, bez innego wariantu TEGO dania i bez duplikatów między sobą
+  const currentDish = dishFingerprint(normalized.title)
+  const related = dedupeRecipes(
+    (relatedRaw ?? []).filter(
+      (r: any) => hasActivePromo(r.promo_products) && dishFingerprint(r.title) !== currentDish
+    )
+  ).slice(0, 3)
 
   const schemaOrg = {
     '@context': 'https://schema.org',
@@ -129,7 +121,7 @@ export default async function RecipePage({ params }: Props) {
             : 'inline-flex items-center gap-1.5 text-xs bg-stone-100 text-stone-600 px-2.5 py-1 rounded-full'
         }
       >
-        <CategoryIcon slug={cat.slug} className={light ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5 text-[#1595ff]'} />
+        <CategoryIcon slug={cat.slug} className={light ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5 text-[#12b76a]'} />
         {cat.name}
       </span>
     ))
@@ -149,15 +141,6 @@ export default async function RecipePage({ params }: Props) {
       />
 
       <div className="max-w-5xl mx-auto px-4 py-6">
-        {/* Powrót */}
-        <Link
-          href={normalized.store ? `/?store=${normalized.store.slug}` : '/'}
-          className="no-print inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-600 transition-colors mb-5"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {normalized.store ? `Przepisy · ${normalized.store.name}` : 'Wróć do przepisów'}
-        </Link>
-
         {/* Hero */}
         {normalized.image_url ? (
           <div className="relative aspect-[16/10] sm:aspect-[16/8] rounded-3xl overflow-hidden bg-stone-100 mb-6">
@@ -198,29 +181,39 @@ export default async function RecipePage({ params }: Props) {
           <p className="text-stone-600 text-lg leading-relaxed mb-5">{normalized.description}</p>
         )}
 
-        {/* Akcje + pilność promocji */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <AddToPlan recipe={plannedRecipe} />
-          <RecipeActions
-            recipe={{
-              id: normalized.id,
-              slug: normalized.slug,
-              title: normalized.title,
-              image_url: normalized.image_url,
-              store_name: normalized.store?.name ?? null,
-            }}
-          />
-          {urgencyLabel && soonestTo && (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">
-              ⏳ Promocja {urgencyLabel} (do {new Date(soonestTo).toLocaleDateString('pl-PL', { day: 'numeric', month: 'numeric' })})
-            </span>
-          )}
-          {needsCard && (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-purple-700 bg-purple-50 px-3 py-1.5 rounded-full">
-              🪪 Część cen tylko z kartą sklepu
-            </span>
-          )}
-        </div>
+        {/* Sticky pasek akcji. Po scrollu zostaje tylko powrót, reszta chowa się. */}
+        <StickyActionBar
+          primary={
+            <BackLink
+              fallbackHref={normalized.store ? `/?store=${normalized.store.slug}` : '/'}
+              fallbackLabel={normalized.store ? `Przepisy · ${normalized.store.name}` : 'Wróć do przepisów'}
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold border bg-white text-stone-600 border-stone-200 hover:border-stone-300 transition-colors"
+            />
+          }
+          extras={
+            <>
+              <RecipeActions
+                recipe={{
+                  id: normalized.id,
+                  slug: normalized.slug,
+                  title: normalized.title,
+                  image_url: normalized.image_url,
+                  store_name: normalized.store?.name ?? null,
+                }}
+              />
+              {urgencyLabel && soonestTo && (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">
+                  ⏳ Promocja {urgencyLabel} (do {new Date(soonestTo).toLocaleDateString('pl-PL', { day: 'numeric', month: 'numeric' })})
+                </span>
+              )}
+              {needsCard && (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-purple-700 bg-purple-50 px-3 py-1.5 rounded-full">
+                  🪪 Część cen tylko z kartą sklepu
+                </span>
+              )}
+            </>
+          }
+        />
 
         {/* Pasek wartości */}
         <div className="flex flex-wrap items-stretch gap-y-4 bg-white rounded-2xl border border-stone-100 p-5 mb-8 divide-x divide-stone-100">
@@ -240,14 +233,55 @@ export default async function RecipePage({ params }: Props) {
               <div className="text-xs text-stone-500 mt-0.5">Trudność</div>
             </div>
           )}
+          {normalized.servings && (
+            <div className="flex-1 min-w-[80px] px-4 text-center">
+              <Users className="w-5 h-5 text-amber-500 mx-auto mb-1" />
+              <div className="font-semibold text-stone-800">{normalized.servings}</div>
+              <div className="text-xs text-stone-500">{normalized.servings === 1 ? 'porcja' : normalized.servings < 5 ? 'porcje' : 'porcji'}</div>
+            </div>
+          )}
           {normalized.price_total && (
             <div className="flex-1 min-w-[80px] px-4 text-center">
               <ShoppingBag className="w-5 h-5 text-amber-500 mx-auto mb-1" />
               <div className="font-semibold text-stone-800">{formatPrice(normalized.price_total)}</div>
-              <div className="text-xs text-stone-500">Koszt</div>
+              <div className="text-xs text-stone-500">Koszt <span className="text-stone-400">(orientacyjny)</span></div>
             </div>
           )}
+          {(() => {
+            const base = (normalized.price_total ?? 0) + savings
+            const percent = base > 0 && savings >= 0.5 ? Math.round((savings / base) * 100) : 0
+            return percent > 0 ? (
+              <div className="flex-1 min-w-[80px] px-4 text-center">
+                <PiggyBank className="w-5 h-5 text-green-600 mx-auto mb-1" />
+                <div className="font-extrabold text-green-700 text-lg leading-tight">−{percent}%</div>
+                <div className="text-xs text-stone-500">taniej z gazetki</div>
+              </div>
+            ) : null
+          })()}
         </div>
+
+        {(() => {
+          const base = (normalized.price_total ?? 0) + savings
+          const percent = base > 0 && savings >= 0.5 ? Math.round((savings / base) * 100) : 0
+          if (percent === 0) return null
+          return (
+            <div className="mb-8 flex items-center gap-3 rounded-2xl bg-green-100 border border-green-200 px-4 py-3 shadow-sm">
+              <PiggyBank className="w-6 h-6 text-green-700 flex-shrink-0" />
+              <p className="text-sm text-green-900">
+                Kupując produkty z gazetki, ten przepis wychodzi Cię o{' '}
+                <span className="font-extrabold text-base">−{percent}%</span> taniej niż w standardowej cenie.
+              </p>
+            </div>
+          )
+        })()}
+
+        {/* Krótka nota o cenach — brak ryzyka roszczeń */}
+        {normalized.price_total && (
+          <p className="mb-6 text-[11px] text-stone-400 leading-relaxed">
+            Ceny są <strong>orientacyjne</strong> — obliczone na podstawie cen z gazetek promocyjnych i typowych cen w polskich sklepach.
+            Nie stanowią oferty handlowej; rzeczywista cena i dostępność mogą się różnić.
+          </p>
+        )}
 
         {/* Reklama (nieaktywna do czasu podłączenia AdSense + zgody) */}
         <AdSlot className="no-print mb-8" />

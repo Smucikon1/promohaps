@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { extractLeafletProducts } from '@/lib/ai'
+import { checkLimit } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 300 // odczyt jednej strony przez model bywa wolny
 
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Brak autoryzacji.' }, { status: 401 })
+
+  // Ekstrakcja jest droga (analiza obrazu) — trzymamy niżej niż generowanie
+  const gate = checkLimit(`extract:${user.id}`, 30, 60 * 60 * 1000)
+  if (!gate.ok) return NextResponse.json({ error: 'Za dużo żądań, spróbuj później.' }, { status: 429, headers: { 'Retry-After': String(gate.retryAfter) } })
 
   let body: any
   try {

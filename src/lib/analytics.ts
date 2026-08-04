@@ -66,6 +66,9 @@ export const track = {
   filterUsed: (filters: Record<string, string>) =>
     trackEvent({ event_type: 'filter_used', metadata: filters }),
 
+  favoriteAdd: (recipeId: string) =>
+    trackEvent({ event_type: 'favorite_add', recipe_id: recipeId }),
+
   shoppingListAdd: (recipeId: string) =>
     trackEvent({ event_type: 'shopping_list_add', recipe_id: recipeId }),
 

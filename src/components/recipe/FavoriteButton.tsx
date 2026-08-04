@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isFavorite, toggleFavorite, FAVORITES_EVENT, type FavoriteRecipe } from '@/lib/favorites'
+import { track } from '@/lib/analytics'
 
 interface Props {
   recipe: FavoriteRecipe
@@ -23,7 +24,10 @@ export function FavoriteButton({ recipe, variant = 'overlay' }: Props) {
   const onClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setFav(toggleFavorite(recipe))
+    const added = toggleFavorite(recipe)
+    setFav(added)
+    // Licznik popularności zliczamy tylko przy DODANIU (nie przy usuwaniu)
+    if (added) track.favoriteAdd(recipe.id)
   }
 
   const label = fav ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'

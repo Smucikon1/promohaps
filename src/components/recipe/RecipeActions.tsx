@@ -41,7 +41,7 @@ export function RecipeActions({ recipe }: { recipe: FavoriteRecipe }) {
       </button>
 
       <button
-        onClick={() => window.print()}
+        onClick={() => setTimeout(() => window.print(), 0)}
         aria-label="Drukuj przepis"
         className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold border bg-white text-stone-600 border-stone-200 hover:border-stone-300 transition-colors"
       >

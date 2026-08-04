@@ -3,25 +3,22 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Home, CalendarDays, ShoppingCart, Heart } from 'lucide-react'
+import { Home, ShoppingCart, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { countShoppingItems, SHOPPING_EVENT } from '@/lib/shopping'
 import { countFavorites, FAVORITES_EVENT } from '@/lib/favorites'
-import { countPlanned, MEAL_PLAN_EVENT } from '@/lib/mealPlan'
 
-const EVENTS = [SHOPPING_EVENT, FAVORITES_EVENT, MEAL_PLAN_EVENT, 'focus', 'storage']
+const EVENTS = [SHOPPING_EVENT, FAVORITES_EVENT, 'focus', 'storage']
 
 export function BottomNav() {
   const pathname = usePathname()
   const [cart, setCart] = useState(0)
   const [fav, setFav] = useState(0)
-  const [plan, setPlan] = useState(0)
 
   useEffect(() => {
     const update = () => {
       setCart(countShoppingItems())
       setFav(countFavorites())
-      setPlan(countPlanned())
     }
     update()
     EVENTS.forEach((e) => window.addEventListener(e, update))
@@ -32,7 +29,6 @@ export function BottomNav() {
 
   const tabs = [
     { href: '/', label: 'Przepisy', icon: Home, active: pathname === '/', badge: 0, fill: false },
-    { href: '/plan', label: 'Jadłospis', icon: CalendarDays, active: pathname === '/plan', badge: plan, fill: false },
     { href: '/lista-zakupow', label: 'Lista', icon: ShoppingCart, active: pathname === '/lista-zakupow', badge: cart, fill: false },
     { href: '/ulubione', label: 'Ulubione', icon: Heart, active: pathname === '/ulubione', badge: fav, fill: true },
   ]

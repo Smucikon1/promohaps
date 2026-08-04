@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Regulamin',
-  description: 'Regulamin korzystania z serwisu Sapri.',
+  description: 'Regulamin korzystania z serwisu Promohaps.',
   robots: { index: true, follow: true },
 }
 
@@ -26,7 +26,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-lg font-bold text-stone-900 mb-2">1. Postanowienia ogólne</h2>
-          <p>Serwis „Sapri" (sapri.pl) udostępnia przepisy kulinarne powiązane z aktualnymi promocjami w sieciach handlowych. Usługodawcą jest <strong>[nazwa firmy / imię i nazwisko]</strong>.</p>
+          <p>Serwis „Promohaps" (promohaps.pl) udostępnia przepisy kulinarne powiązane z aktualnymi promocjami w sieciach handlowych. Usługodawcą jest <strong>Tomasz Pawłowicz, NIP 5632331998</strong>.</p>
         </section>
 
         <section>
@@ -41,12 +41,12 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-lg font-bold text-stone-900 mb-2">4. Odpowiedzialność</h2>
-          <p>Dokładamy starań, aby treści były rzetelne, jednak nie ponosimy odpowiedzialności za decyzje zakupowe podjęte na ich podstawie. Nazwy sieci handlowych należą do ich właścicieli; serwis nie jest z nimi powiązany.</p>
+          <p>Dokładamy starań, aby treści były rzetelne, jednak nie ponosimy odpowiedzialności za decyzje zakupowe podjęte na ich podstawie. Nazwy oraz logotypy sieci handlowych są znakami towarowymi ich właścicieli i są używane wyłącznie w celach informacyjnych; serwis nie jest z tymi sieciami powiązany ani przez nie sponsorowany.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-bold text-stone-900 mb-2">5. Kontakt</h2>
-          <p>Pytania i reklamacje: <strong>[adres e-mail]</strong>.</p>
+          <p>Pytania i reklamacje: <strong>grafikstp@gmail.com</strong>.</p>
         </section>
 
         <p className="text-sm text-stone-400 pt-4 border-t border-stone-100">

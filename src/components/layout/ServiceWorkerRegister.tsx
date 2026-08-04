@@ -2,22 +2,22 @@
 
 import { useEffect } from 'react'
 
+// PWA/Service Worker wyłączony na czas rozwoju — cache'owanie zasobów zależnych
+// od builda serwowało nieaktualne strony po każdej przebudowie i skrzynkowo
+// „psuło" działające funkcje. Ten komponent AKTYWNIE wyrejestrowuje każdego SW
+// i czyści wszystkie cache, żeby przeglądarki same się naprawiły.
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
 
-    if (process.env.NODE_ENV !== 'production') {
-      // W dev: usuń ewentualnego starego SW i cache, by nie serwował nieaktualnego bundla
-      navigator.serviceWorker.getRegistrations().then((regs) => {
-        regs.forEach((r) => r.unregister())
-      }).catch(() => {})
-      if (typeof caches !== 'undefined') {
-        caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {})
-      }
-      return
-    }
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => regs.forEach((r) => r.unregister()))
+      .catch(() => {})
 
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+    if (typeof caches !== 'undefined') {
+      caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {})
+    }
   }, [])
 
   return null

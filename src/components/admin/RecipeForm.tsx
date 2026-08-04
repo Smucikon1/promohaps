@@ -1,5 +1,6 @@
 'use client'
 
+import { revalidateCatalog } from '@/app/actions/revalidate'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -207,6 +208,7 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
 
     setDirty(false)
     router.push(`/admin/przepisy?saved=${isEdit ? 'edit' : 'new'}`)
+    await revalidateCatalog()
     router.refresh()
   }
 
@@ -310,7 +312,7 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
               onClick={() => toggleCategory(cat.id)}
               className={cn('category-pill', selectedCategories.includes(cat.id) && 'active')}
             >
-              <CategoryIcon slug={cat.slug} className="w-3.5 h-3.5 text-[#1595ff]" />
+              <CategoryIcon slug={cat.slug} className="w-3.5 h-3.5 text-[#12b76a]" />
               {cat.name}
             </button>
           ))}

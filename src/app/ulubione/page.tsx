@@ -2,21 +2,22 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { Heart, ArrowLeft, X } from 'lucide-react'
-import {
-  readFavorites,
-  removeFavorite,
-  FAVORITES_EVENT,
-  type FavoriteRecipe,
-} from '@/lib/favorites'
+import { Heart, ArrowLeft } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { readFavorites, pruneFavorites, FAVORITES_EVENT } from '@/lib/favorites'
+import { hasActivePromo } from '@/lib/utils'
+import { RecipeCard } from '@/components/recipe/RecipeCard'
+import type { Recipe } from '@/types'
 
+// Ulubione — pełne kafelki jak na stronie przepisów (RecipeCard).
+// Dane przepisu (składniki, promocje, ceny) dociągamy z bazy po id z localStorage.
 export default function FavoritesPage() {
-  const [items, setItems] = useState<FavoriteRecipe[]>([])
+  const [ids, setIds] = useState<string[]>([])
+  const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loaded, setLoaded] = useState(false)
 
   const sync = useCallback(() => {
-    setItems(readFavorites())
+    setIds(readFavorites().map((r) => r.id))
     setLoaded(true)
   }, [])
 
@@ -25,6 +26,45 @@ export default function FavoritesPage() {
     window.addEventListener(FAVORITES_EVENT, sync)
     return () => window.removeEventListener(FAVORITES_EVENT, sync)
   }, [sync])
+
+  const idsSig = ids.join(',')
+  useEffect(() => {
+    if (ids.length === 0) {
+      setRecipes([])
+      return
+    }
+    let alive = true
+    createClient()
+      .from('recipes')
+      .select(
+        `id, slug, title, description, image_url, prep_time_min, difficulty, price_total,
+         store:stores(id, name, slug),
+         categories:recipe_categories(category:categories(id, name, slug)),
+         promo_products(*)`
+      )
+      .in('id', ids)
+      .eq('is_published', true)
+      .then(({ data }) => {
+        if (!alive) return
+        const rows = (data ?? []).map((r: any) => ({
+          ...r,
+          store: Array.isArray(r.store) ? r.store[0] : r.store,
+          categories: (r.categories ?? []).map((rc: any) => rc.category).filter(Boolean),
+        })) as any[]
+        // Pokazujemy tylko przepisy z aktywną promocją (spójnie z resztą serwisu).
+        // Wygasłe/wyłączone znikają z ulubionych na stałe.
+        const active = rows.filter((r) => hasActivePromo(r.promo_products))
+        pruneFavorites(new Set(active.map((r) => r.id)))
+        // Zachowaj kolejność z localStorage (najnowsze pierwsze)
+        const order = new Map(ids.map((id, i) => [id, i]))
+        active.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
+        setRecipes(active as Recipe[])
+      })
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsSig])
 
   if (!loaded) return null
 
@@ -46,19 +86,15 @@ export default function FavoritesPage() {
           <h1 className="text-2xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>
             Ulubione
           </h1>
-          {items.length > 0 && (
-            <p className="text-sm text-stone-500">{items.length} zapisanych przepisów</p>
-          )}
+          {recipes.length > 0 && <p className="text-sm text-stone-500">{recipes.length} zapisanych przepisów</p>}
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {recipes.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border border-stone-100">
           <div className="text-5xl mb-4">❤️</div>
           <h2 className="text-xl font-bold mb-2 text-stone-700">Brak ulubionych</h2>
-          <p className="text-stone-400 mb-6">
-            Kliknij serduszko na dowolnym przepisie, aby zapisać go tutaj.
-          </p>
+          <p className="text-stone-400 mb-6">Kliknij serduszko na dowolnym przepisie, aby zapisać go tutaj.</p>
           <Link
             href="/"
             className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors"
@@ -68,42 +104,8 @@ export default function FavoritesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {items.map((r) => (
-            <div key={r.id} className="recipe-card group relative">
-              <button
-                onClick={() => removeFavorite(r.id)}
-                aria-label={`Usuń ${r.title} z ulubionych`}
-                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-sm flex items-center justify-center text-red-500 hover:text-red-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <Link href={`/przepis/${r.slug}`} className="block">
-                <div className="relative aspect-[4/3] bg-stone-100 overflow-hidden">
-                  {r.image_url ? (
-                    <Image
-                      src={r.image_url}
-                      alt={r.title}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-4xl bg-gradient-to-br from-amber-50 to-stone-100">
-                      🍽️
-                    </div>
-                  )}
-                  {r.store_name && (
-                    <div className="store-badge absolute top-3 left-3 bg-stone-700">{r.store_name}</div>
-                  )}
-                </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-stone-800 text-base leading-snug line-clamp-2"
-                    style={{ fontFamily: 'var(--font-serif)' }}>
-                    {r.title}
-                  </h3>
-                </div>
-              </Link>
-            </div>
+          {recipes.map((r, i) => (
+            <RecipeCard key={r.id} recipe={r} index={i} />
           ))}
         </div>
       )}

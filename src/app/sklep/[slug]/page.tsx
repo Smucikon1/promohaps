@@ -5,7 +5,8 @@ import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { storeColor } from '@/lib/stores'
-import { isPromoExpired } from '@/lib/utils'
+import { hasActivePromo } from '@/lib/utils'
+import { dedupeRecipes } from '@/lib/recipeDedupe'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -41,17 +42,21 @@ export default async function StorePage({ params }: Props) {
     .from('recipes')
     .select(`*, store:stores(*), categories:recipe_categories(category:categories(*)), promo_products(*)`)
     .eq('is_published', true)
+    // Bez ceny przepis nie ma sensu w tej aplikacji — nie pokazujemy niedokończonych
+    .gt('price_total', 0)
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
     .limit(48)
 
-  const recipes = (rawRecipes ?? [])
-    // Przepisy z wygasłą promocją znikają
-    .filter((r: any) => !(r.promo_products ?? []).some((p: any) => isPromoExpired(p.valid_to)))
-    .map((r: any) => ({
-      ...r,
-      categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
-    }))
+  const recipes = dedupeRecipes(
+    (rawRecipes ?? [])
+      // Tylko przepisy z trwającą promocją (wygasłe i te bez gazetki znikają)
+      .filter((r: any) => hasActivePromo(r.promo_products))
+      .map((r: any) => ({
+        ...r,
+        categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
+      }))
+  )
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
