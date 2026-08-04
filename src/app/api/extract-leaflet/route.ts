@@ -4,7 +4,7 @@ import { extractLeafletProducts } from '@/lib/ai'
 import { checkLimit } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300 // odczyt jednej strony przez model bywa wolny
+export const maxDuration = 60 // Vercel Hobby ma twardy limit 60s; Sonnet 5 mieści się w tym czasie
 
 export async function POST(request: Request) {
   const supabase = await createClient()

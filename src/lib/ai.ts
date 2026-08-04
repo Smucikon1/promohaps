@@ -167,7 +167,7 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
   }
 
   const response = await client().messages.create({
-    model: 'claude-opus-4-8',
+    model: 'claude-sonnet-5',
     max_tokens: 16000,
     thinking: { type: 'adaptive' },
     output_config: { format: { type: 'json_schema', schema } },
@@ -270,7 +270,7 @@ export async function extractLeafletProducts(input: ExtractLeafletInput): Promis
   ].filter(Boolean).join(' ')
 
   const response = await client().messages.create({
-    model: 'claude-opus-4-8',
+    model: 'claude-sonnet-5',
     max_tokens: 16000,
     thinking: { type: 'adaptive' },
     output_config: { format: { type: 'json_schema', schema } },
