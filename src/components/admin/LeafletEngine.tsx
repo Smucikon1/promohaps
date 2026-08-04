@@ -427,8 +427,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         reuseProducts: used,
       }),
     })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error ?? 'Nie udało się wygenerować szkicu.')
+    const isJson = res.headers.get('content-type')?.includes('application/json')
+    const data = isJson ? await res.json().catch(() => ({})) : {}
+    if (!res.ok) throw new Error(data.error ?? (res.status === 504 ? 'Timeout serwera — spróbuj ponownie.' : `Błąd (${res.status}).`))
     return {
       draft: { id: data.recipeId, title: data.title, editUrl: data.editUrl },
       used: Array.from(new Set([...used, ...(data.usedProducts ?? [])])),

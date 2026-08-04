@@ -166,11 +166,12 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     instrukcja: 'Wygeneruj jeden kompletny przepis zgodny ze schematem, wykorzystując produkty z gazetki jako składniki, jeśli podano.',
   }
 
+  // thinking wyłączone — content generation nie potrzebuje reasoning, a Vercel Hobby ma limit 60s
   const response = await client().messages.create({
     model: 'claude-sonnet-5',
-    max_tokens: 16000,
-    thinking: { type: 'adaptive' },
-    output_config: { format: { type: 'json_schema', schema } },
+    max_tokens: 8000,
+    thinking: { type: 'disabled' },
+    output_config: { format: { type: 'json_schema', schema }, effort: 'low' },
     system,
     messages: [{ role: 'user', content: JSON.stringify(payload) }],
   } as any)
@@ -269,11 +270,12 @@ export async function extractLeafletProducts(input: ExtractLeafletInput): Promis
     many ? 'Nie pomijaj żadnej strony i nie duplikuj tego samego produktu.' : '',
   ].filter(Boolean).join(' ')
 
+  // Vision + JSON schema — thinking wyłączone by zmieścić się w 60s (Vercel Hobby)
   const response = await client().messages.create({
     model: 'claude-sonnet-5',
-    max_tokens: 16000,
-    thinking: { type: 'adaptive' },
-    output_config: { format: { type: 'json_schema', schema } },
+    max_tokens: 8000,
+    thinking: { type: 'disabled' },
+    output_config: { format: { type: 'json_schema', schema }, effort: 'low' },
     messages: [{ role: 'user', content: [...mediaBlocks, { type: 'text', text: instruction }] }],
   } as any)
 

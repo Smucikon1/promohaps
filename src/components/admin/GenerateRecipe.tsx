@@ -33,9 +33,11 @@ export function GenerateRecipe({ stores, categories }: Props) {
           categorySlugs: categories.map((c) => c.slug),
         }),
       })
-      const data = await res.json()
+      // Serwer bywa zwraca HTML (504 timeout, error page) — parsujemy JSON dopiero po sprawdzeniu content-type
+      const isJson = res.headers.get('content-type')?.includes('application/json')
+      const data = isJson ? await res.json().catch(() => ({})) : {}
       if (!res.ok) {
-        setError(data.error ?? 'Nie udało się wygenerować przepisu.')
+        setError(data.error ?? (res.status === 504 ? 'Serwer nie zdążył odpowiedzieć (timeout). Spróbuj ponownie.' : `Błąd serwera (${res.status}).`))
         return
       }
       const r = data.recipe
