@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ArrowLeft } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { storeColor } from '@/lib/stores'
 import { hasActivePromo } from '@/lib/utils'
@@ -60,10 +59,6 @@ export default async function StorePage({ params }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-600 transition-colors mb-6">
-        <ArrowLeft className="w-4 h-4" /> Wszystkie przepisy
-      </Link>
-
       <div className="flex items-center gap-3 mb-2">
         <span className="store-badge text-sm" style={{ backgroundColor: storeColor(store.slug) }}>{store.name}</span>
       </div>

@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ArrowLeft } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { hasActivePromo } from '@/lib/utils'
@@ -64,10 +63,6 @@ export default async function CategoryPage({ params }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-600 transition-colors mb-6">
-        <ArrowLeft className="w-4 h-4" /> Wszystkie przepisy
-      </Link>
-
       <h1 className="flex items-center gap-2.5 text-3xl md:text-4xl font-bold text-stone-900 mb-3" style={{ fontFamily: 'var(--font-serif)' }}>
         <CategoryIcon slug={cat.slug} className="w-7 h-7 text-[#12b76a]" />
         {cat.name}

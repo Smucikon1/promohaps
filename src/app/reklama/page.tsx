@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
-import { ArrowLeft, Megaphone, Target, BarChart3, Mail } from 'lucide-react'
+import { Megaphone, Target, BarChart3, Mail } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Reklama i współpraca',
@@ -17,10 +16,6 @@ const FORMATS = [
 export default function AdvertisePage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-600 transition-colors mb-6">
-        <ArrowLeft className="w-4 h-4" /> Wróć do przepisów
-      </Link>
-
       <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-4" style={{ fontFamily: 'var(--font-serif)' }}>
         Dotrzyj do kupujących w momencie decyzji
       </h1>

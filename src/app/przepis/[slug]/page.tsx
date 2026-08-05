@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Clock, Flame, ShoppingBag, ArrowLeft, PiggyBank, Users } from 'lucide-react'
+import { Clock, Flame, ShoppingBag, PiggyBank, Users } from 'lucide-react'
 import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, isPromoExpired, promoDaysLeft, hasActivePromo } from '@/lib/utils'
 import { totalSavings } from '@/lib/savings'
 import { storeColor } from '@/lib/stores'
@@ -11,12 +11,10 @@ import { ShoppingList } from '@/components/recipe/ShoppingList'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { RecipeActions } from '@/components/recipe/RecipeActions'
-import { StickyActionBar } from '@/components/recipe/StickyActionBar'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { RecipeTracker } from '@/components/recipe/RecipeTracker'
 import { RecordView } from '@/components/recipe/RecordView'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
-import { BackLink } from '@/components/layout/BackLink'
 import { dedupeRecipes, dishFingerprint } from '@/lib/recipeDedupe'
 
 interface Props {
@@ -181,39 +179,28 @@ export default async function RecipePage({ params }: Props) {
           <p className="text-stone-600 text-lg leading-relaxed mb-5">{normalized.description}</p>
         )}
 
-        {/* Sticky pasek akcji. Po scrollu zostaje tylko powrót, reszta chowa się. */}
-        <StickyActionBar
-          primary={
-            <BackLink
-              fallbackHref={normalized.store ? `/?store=${normalized.store.slug}` : '/'}
-              fallbackLabel={normalized.store ? `Przepisy · ${normalized.store.name}` : 'Wróć do przepisów'}
-              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold border bg-white text-stone-600 border-stone-200 hover:border-stone-300 transition-colors"
-            />
-          }
-          extras={
-            <>
-              <RecipeActions
-                recipe={{
-                  id: normalized.id,
-                  slug: normalized.slug,
-                  title: normalized.title,
-                  image_url: normalized.image_url,
-                  store_name: normalized.store?.name ?? null,
-                }}
-              />
-              {urgencyLabel && soonestTo && (
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">
-                  ⏳ Promocja {urgencyLabel} (do {new Date(soonestTo).toLocaleDateString('pl-PL', { day: 'numeric', month: 'numeric' })})
-                </span>
-              )}
-              {needsCard && (
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-purple-700 bg-purple-50 px-3 py-1.5 rounded-full">
-                  🪪 Część cen tylko z kartą sklepu
-                </span>
-              )}
-            </>
-          }
-        />
+        {/* Akcje przepisu (Wróć jest teraz pływający pod logotypem w layout) */}
+        <div className="no-print flex flex-wrap items-center gap-3 mb-6">
+          <RecipeActions
+            recipe={{
+              id: normalized.id,
+              slug: normalized.slug,
+              title: normalized.title,
+              image_url: normalized.image_url,
+              store_name: normalized.store?.name ?? null,
+            }}
+          />
+          {urgencyLabel && soonestTo && (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">
+              ⏳ Promocja {urgencyLabel} (do {new Date(soonestTo).toLocaleDateString('pl-PL', { day: 'numeric', month: 'numeric' })})
+            </span>
+          )}
+          {needsCard && (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-purple-700 bg-purple-50 px-3 py-1.5 rounded-full">
+              🪪 Część cen tylko z kartą sklepu
+            </span>
+          )}
+        </div>
 
         {/* Pasek wartości */}
         <div className="flex flex-wrap items-stretch gap-y-4 bg-white rounded-2xl border border-stone-100 p-5 mb-8 divide-x divide-stone-100">

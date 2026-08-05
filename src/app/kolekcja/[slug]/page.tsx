@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ArrowLeft } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { fetchRecipes } from '@/lib/recipeQuery'
 import { getCollection, COLLECTIONS } from '@/lib/collections'
@@ -43,10 +42,6 @@ export default async function CollectionPage({ params }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-600 transition-colors mb-6">
-        <ArrowLeft className="w-4 h-4" /> Wszystkie przepisy
-      </Link>
-
       <h1 className="text-3xl font-bold text-stone-900 mb-2" style={{ fontFamily: 'var(--font-serif)' }}>
         {col.title}
       </h1>

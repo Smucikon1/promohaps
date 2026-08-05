@@ -8,6 +8,7 @@ import { BottomNav } from '@/components/layout/BottomNav'
 import { AnalyticsBanner } from '@/components/layout/AnalyticsBanner'
 import { ServiceWorkerRegister } from '@/components/layout/ServiceWorkerRegister'
 import { NavDepthTracker } from '@/components/layout/NavDepthTracker'
+import { FloatingBack } from '@/components/layout/FloatingBack'
 import { Analytics } from '@vercel/analytics/react'
 
 // Outfit dla całego dokumentu — tekst (--font-sans) i nagłówki (--font-serif)
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ServiceWorkerRegister />
         <NavDepthTracker />
         <Header />
+        <FloatingBack />
         <main className="min-h-screen pb-20 md:pb-0">{children}</main>
         <BottomNav />
         <AnalyticsBanner />
