@@ -5,6 +5,9 @@ import type { AnalyticsEvent } from '@/types'
 
 const SESSION_KEY = 'przepisnik_session_id'
 const CONSENT_KEY = 'przepisnik_analytics_consent'
+// Emitowane po zmianie zgody, żeby integracje (Meta Pixel, GA itp.) mogły
+// aktywować się natychmiast bez konieczności refresh strony.
+export const ANALYTICS_CONSENT_EVENT = 'przepisnik:analytics-consent'
 
 function getSessionId(): string {
   if (typeof window === 'undefined') return ''
@@ -29,10 +32,12 @@ export function getAnalyticsConsent(): 'granted' | 'denied' | null {
 
 export function grantAnalyticsConsent() {
   localStorage.setItem(CONSENT_KEY, 'granted')
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(ANALYTICS_CONSENT_EVENT))
 }
 
 export function denyAnalyticsConsent() {
   localStorage.setItem(CONSENT_KEY, 'denied')
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(ANALYTICS_CONSENT_EVENT))
 }
 
 export async function trackEvent(event: Omit<AnalyticsEvent, 'session_id'>) {

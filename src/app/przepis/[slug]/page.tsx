@@ -97,6 +97,33 @@ export default async function RecipePage({ params }: Props) {
     )
   ).slice(0, 3)
 
+  // "Podobne, ale taniej" — z tej samej kategorii, tańsze niż bieżący, dowolny sklep.
+  // Podnosi PV/session (użytkownik klika dalej) → więcej wyświetleń reklam.
+  const currentCatIds: string[] = normalized.categories.map((c: any) => c.id).filter(Boolean)
+  const currentPrice = normalized.price_total ?? 999999
+  let cheaper: any[] = []
+  if (currentCatIds.length > 0 && currentPrice > 0) {
+    const { data: cheaperRaw } = await supabase
+      .from('recipes')
+      .select('*, store:stores(*), categories:recipe_categories!inner(category:categories(*)), promo_products(*)')
+      .eq('is_published', true)
+      .gt('price_total', 0)
+      .lt('price_total', currentPrice)
+      .in('recipe_categories.category_id', currentCatIds)
+      .neq('id', normalized.id)
+      .order('price_total', { ascending: true })
+      .limit(8)
+    const cheaperNormalized = (cheaperRaw ?? []).map((r: any) => ({
+      ...r,
+      categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
+    }))
+    cheaper = dedupeRecipes(
+      cheaperNormalized.filter(
+        (r: any) => hasActivePromo(r.promo_products) && dishFingerprint(r.title) !== currentDish
+      )
+    ).slice(0, 3)
+  }
+
   const schemaOrg = {
     '@context': 'https://schema.org',
     '@type': 'Recipe',
@@ -310,6 +337,25 @@ export default async function RecipePage({ params }: Props) {
             )}
           </div>
         </div>
+
+        {/* Podobne, ale taniej — z tej samej kategorii, niższa cena */}
+        {cheaper.length > 0 && (
+          <section className="no-print mt-16">
+            <div className="flex items-baseline justify-between gap-3 mb-6 flex-wrap">
+              <h2 className="text-2xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>
+                Podobne, ale taniej
+              </h2>
+              <span className="text-sm text-stone-500">
+                Do {formatPrice(currentPrice)} — te są tańsze
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {cheaper.map((r: any, i: number) => (
+                <RecipeCard key={r.id} recipe={r} index={i} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Powiązane przepisy */}
         {related.length > 0 && (

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Share2, Printer, Check } from 'lucide-react'
 import { FavoriteButton } from '@/components/recipe/FavoriteButton'
+import { PinterestSaveButton } from '@/components/recipe/PinterestSaveButton'
 import type { FavoriteRecipe } from '@/lib/favorites'
 
 export function RecipeActions({ recipe }: { recipe: FavoriteRecipe }) {
@@ -30,6 +31,13 @@ export function RecipeActions({ recipe }: { recipe: FavoriteRecipe }) {
   return (
     <div className="no-print flex flex-wrap items-center gap-2">
       <FavoriteButton variant="inline" recipe={recipe} />
+
+      <PinterestSaveButton
+        variant="inline"
+        url={`/przepis/${recipe.slug}`}
+        imageUrl={recipe.image_url}
+        description={recipe.title}
+      />
 
       <button
         onClick={share}

@@ -9,6 +9,8 @@ import { AnalyticsBanner } from '@/components/layout/AnalyticsBanner'
 import { ServiceWorkerRegister } from '@/components/layout/ServiceWorkerRegister'
 import { NavDepthTracker } from '@/components/layout/NavDepthTracker'
 import { FloatingBack } from '@/components/layout/FloatingBack'
+import { MetaPixel } from '@/components/layout/MetaPixel'
+import { NewsletterPopup } from '@/components/layout/NewsletterPopup'
 import { Analytics } from '@vercel/analytics/react'
 
 // Outfit dla całego dokumentu — tekst (--font-sans) i nagłówki (--font-serif)
@@ -69,7 +71,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="min-h-screen pb-20 md:pb-0">{children}</main>
         <BottomNav />
         <AnalyticsBanner />
+        <NewsletterPopup />
         <Analytics />
+        <MetaPixel />
         <footer className="hidden md:block bg-white border-t border-stone-100 py-8 mt-16">
           <div className="max-w-6xl mx-auto px-4 text-center text-stone-500 text-sm">
             <p>© {new Date().getFullYear()} Promohaps</p>

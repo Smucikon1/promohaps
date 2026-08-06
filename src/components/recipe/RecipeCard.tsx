@@ -7,6 +7,7 @@ import { formatPrice, formatTime, difficultyLabel, promoDaysLeftLabel, cn } from
 import { StoreLogo } from '@/components/recipe/StoreLogo'
 import { activePromos, totalSavings } from '@/lib/savings'
 import { FavoriteButton } from '@/components/recipe/FavoriteButton'
+import { PinterestSaveButton } from '@/components/recipe/PinterestSaveButton'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import type { Recipe } from '@/types'
 import { track } from '@/lib/analytics'
@@ -28,8 +29,9 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
 
   return (
     <div className={cn('recipe-card group relative animate-fade-in-up', `stagger-${(index % 4) + 1}`)}>
-      {/* Ulubione — poza <a>, by nie zagnieżdżać interaktywnych elementów */}
-      <div className="absolute top-3 right-3 z-10">
+      {/* Akcje (ulubione + Pin it) — poza <a>, by nie zagnieżdżać interaktywnych elementów.
+          Pin it pojawia się na hoverze, żeby nie zagęszczać kart. */}
+      <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
         <FavoriteButton
           variant="overlay"
           recipe={{
@@ -40,6 +42,13 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
             store_name: recipe.store?.name ?? null,
           }}
         />
+        <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          <PinterestSaveButton
+            url={`/przepis/${recipe.slug}`}
+            imageUrl={recipe.image_url}
+            description={recipe.title}
+          />
+        </div>
       </div>
 
       <Link
