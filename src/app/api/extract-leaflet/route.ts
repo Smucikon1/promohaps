@@ -11,8 +11,9 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Brak autoryzacji.' }, { status: 401 })
 
-  // Ekstrakcja jest droga (analiza obrazu) — trzymamy niżej niż generowanie
-  const gate = checkLimit(`extract:${user.id}`, 30, 60 * 60 * 1000)
+  // Ekstrakcja jest droga (obraz per request), ale gazetki mają 60-100 stron —
+  // klient wysyła jedno żądanie na stronę, więc limit musi to obsłużyć.
+  const gate = checkLimit(`extract:${user.id}`, 300, 60 * 60 * 1000)
   if (!gate.ok) return NextResponse.json({ error: 'Za dużo żądań, spróbuj później.' }, { status: 429, headers: { 'Retry-After': String(gate.retryAfter) } })
 
   let body: any

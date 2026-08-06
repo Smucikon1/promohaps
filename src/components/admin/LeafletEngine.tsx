@@ -272,23 +272,34 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
       if (pages.length === 0) throw new Error('PDF nie zawiera stron.')
 
       // 2) Wysyłka partiami — omija limit rozmiaru żądania.
-      // Jedno żądanie z ponowieniem przy błędzie sieci (mniejsze partie = pewniej).
+      // Ponawiamy przy błędach sieci, 429 (rate limit — respect Retry-After) i 5xx.
       const fetchBatch = async (slice: PageImage[], attempt = 0): Promise<any> => {
+        const MAX_ATTEMPTS = 4
         try {
           const res = await fetch('/api/extract-leaflet', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ images: slice, storeName: store?.name ?? '' }),
           })
+          if (res.status === 429 && attempt < MAX_ATTEMPTS) {
+            const retryAfter = Number(res.headers.get('Retry-After')) || 30
+            await new Promise((r) => setTimeout(r, Math.min(retryAfter * 1000, 60_000)))
+            return fetchBatch(slice, attempt + 1)
+          }
+          if (res.status >= 500 && res.status < 600 && attempt < MAX_ATTEMPTS) {
+            await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+            return fetchBatch(slice, attempt + 1)
+          }
           if (!res.ok) {
-            const d = await res.json().catch(() => ({}))
+            const isJson = res.headers.get('content-type')?.includes('application/json')
+            const d = isJson ? await res.json().catch(() => ({})) : {}
             throw new Error(d.error ?? `Serwer zwrócił błąd ${res.status}.`)
           }
           return await res.json()
         } catch (err: any) {
           const isNetwork =
             err?.name === 'TypeError' || /NetworkError|Failed to fetch|networkerror|load failed/i.test(err?.message ?? '')
-          if (isNetwork && attempt < 2) {
+          if (isNetwork && attempt < MAX_ATTEMPTS) {
             await new Promise((r) => setTimeout(r, 800 * (attempt + 1)))
             return fetchBatch(slice, attempt + 1)
           }
@@ -301,6 +312,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
       const batches = Math.ceil(pages.length / PAGES_PER_REQUEST)
       let failedPages = 0
 
+      const errorSample: string[] = []
       for (let b = 0; b < batches; b++) {
         const slice = pages.slice(b * PAGES_PER_REQUEST, (b + 1) * PAGES_PER_REQUEST)
         setProgress(`Odczytuję promocje: strona ${b + 1}/${batches}`)
@@ -313,21 +325,32 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
             merged.push(p)
           }
           setProducts([...merged]) // pokazuj wyniki na bieżąco
-        } catch {
-          // Jedna strona padła — nie przerywamy całości, lecimy dalej
+        } catch (err: any) {
+          // Jedna strona padła — nie przerywamy całości, lecimy dalej.
+          // Logujemy pierwsze 3 błędy do konsoli, żeby użytkownik/dev widział przyczynę.
           failedPages += slice.length
+          if (errorSample.length < 3) {
+            const msg = (err?.message ?? String(err)).slice(0, 200)
+            errorSample.push(`s.${b + 1}: ${msg}`)
+            console.warn('[leaflet-extract]', msg)
+          }
         }
       }
 
       if (merged.length === 0) {
         throw new Error(
           failedPages > 0
-            ? 'Nie udało się połączyć z serwerem odczytu. Sprawdź połączenie i spróbuj ponownie.'
+            ? `Nie udało się połączyć z serwerem odczytu (${failedPages} stron). Pierwszy błąd: ${errorSample[0] ?? 'nieznany'}`
             : 'Nie znaleziono produktów spożywczych w tej gazetce.'
         )
       }
       if (failedPages > 0) {
-        setError(`Odczytano ${merged.length} produktów, ale ${failedPages} stron nie przetworzono — spróbuj wgrać je ponownie.`)
+        const hint = errorSample[0]?.includes('429')
+          ? ' (limit żądań — odczekaj kilka minut i spróbuj ponownie)'
+          : errorSample[0]?.includes('502') || errorSample[0]?.includes('504')
+          ? ' (timeout serwera AI — spróbuj wgrać ponownie)'
+          : ''
+        setError(`Odczytano ${merged.length} produktów, ale ${failedPages} stron nie przetworzono${hint}. Szczegóły w konsoli (F12).`)
       }
 
       // Prefill okresu ważności z odczytanych dat (najczęstsza wartość)
