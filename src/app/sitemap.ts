@@ -24,6 +24,7 @@ export default async function Sitemap() {
 
   const staticPages = [
     { url: base, lastModified: new Date() },
+    { url: `${base}/zestaw`, lastModified: new Date() },
     { url: `${base}/polityka-prywatnosci`, lastModified: new Date() },
     { url: `${base}/regulamin`, lastModified: new Date() },
     { url: `${base}/reklama`, lastModified: new Date() },

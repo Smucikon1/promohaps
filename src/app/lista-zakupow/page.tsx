@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ShoppingCart, Check, Trash2, ArrowLeft, Tag, UtensilsCrossed, Recycle, ChevronDown, X, Share2 } from 'lucide-react'
+import { ShoppingCart, Check, Trash2, ArrowLeft, Tag, UtensilsCrossed, Recycle, ChevronDown, X, Share2, PiggyBank } from 'lucide-react'
 import { cn, formatPrice } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { hasActivePromo } from '@/lib/utils'
@@ -194,6 +194,18 @@ function ShoppingListInner() {
 
   const checkedCount = items.filter((i) => i.checked).length
   const progress = items.length > 0 ? (checkedCount / items.length) * 100 : 0
+
+  // Ile ta lista kosztuje i ile na niej zaoszczędzisz względem cen regularnych.
+  // Liczone z pozycji, które mają obie ceny — reszta nie wnosi oszczędności.
+  const listCost = items.reduce((s, i) => s + (i.price ?? 0), 0)
+  const listSaved = items.reduce(
+    (s, i) =>
+      i.priceRegular != null && i.price != null && i.priceRegular > i.price
+        ? s + (i.priceRegular - i.price)
+        : s,
+    0
+  )
+  const currentMonth = new Date().toLocaleDateString('pl-PL', { month: 'long' })
 
   // Grupowanie składników per przepis (klucz listy = przepis albo „plan")
   const groupsMap = new Map<string, FlatItem[]>()
@@ -416,6 +428,35 @@ function ShoppingListInner() {
           <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden mb-5">
             <div className="h-full bg-amber-400 transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
+
+          {/* Efekt oszczędzania na tej liście — konkretna kwota zamiast obietnicy */}
+          {listSaved >= 0.5 && (
+            <div className="mb-5 rounded-2xl bg-green-50 border border-green-200 px-4 py-3.5">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <PiggyBank className="w-6 h-6 text-green-700 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-green-900">
+                      Oszczędzasz {formatPrice(listSaved)}
+                      <span className="font-normal text-green-800"> na tych zakupach</span>
+                    </p>
+                    <p className="text-xs text-green-700 mt-0.5">
+                      Kupując z gazetek w tym miesiącu ({currentMonth})
+                    </p>
+                  </div>
+                </div>
+                {listCost > 0 && (
+                  <div className="text-right flex-shrink-0">
+                    <span className="block text-[11px] text-green-700">Do zapłaty</span>
+                    <span className="block text-lg font-bold text-green-900">{formatPrice(listCost)}</span>
+                    <span className="block text-[11px] text-stone-400 line-through">
+                      {formatPrice(listCost + listSaved)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Składniki pogrupowane per przepis */}
           <div className="space-y-4">

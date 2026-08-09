@@ -9,7 +9,9 @@ import { countShoppingItems, SHOPPING_EVENT } from '@/lib/shopping'
 import { countFavorites, FAVORITES_EVENT } from '@/lib/favorites'
 import { SearchToggle } from '@/components/layout/SearchToggle'
 
-const NAV_LINKS: { href: string; label: string; exact?: boolean }[] = []
+const NAV_LINKS: { href: string; label: string; exact?: boolean }[] = [
+  { href: '/zestaw', label: 'Zestaw na tydzień' },
+]
 
 export function Header() {
   const pathname = usePathname()
@@ -55,7 +57,8 @@ export function Header() {
               href={link.href}
               className={cn(
                 'hover:text-amber-600 transition-colors',
-                link.exact && pathname === '/' && 'text-amber-600'
+                (link.exact ? pathname === link.href : pathname.startsWith(link.href)) &&
+                  'text-amber-600 font-semibold'
               )}
             >
               {link.label}
