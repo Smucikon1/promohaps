@@ -6,20 +6,24 @@ import { FeaturedRecipe } from '@/components/recipe/FeaturedRecipe'
 import { FilterTransitionProvider, ResultsPending } from '@/components/recipe/FilterTransition'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { dedupeRecipes } from '@/lib/recipeDedupe'
-import { hasActivePromo } from '@/lib/utils'
+import { hasActivePromo, promoDaysLeft } from '@/lib/utils'
+import { savingsPercent, soonestPromoEnd } from '@/lib/savings'
 import { favoriteCounts } from '@/lib/favoriteCounts'
-import { cachedStores, cachedCategories, cachedCheapest } from '@/lib/catalog'
+import { cachedStores, cachedCategories, cachedCheapest, cachedEndingSoon, ENDING_SOON_DAYS } from '@/lib/catalog'
 import { AdSlot } from '@/components/ads/AdSlot'
-import { Flame, PiggyBank } from 'lucide-react'
+import { Flame, PiggyBank, Hourglass } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Store, Category } from '@/types'
 
 const PAGE_SIZE = 12
+// Ile przepisów przejrzeć przy sortowaniu „Największa oszczędność". Pula aktywnych
+// promocji jest z natury mała (wygasają), więc jedno okno wystarcza na cały ranking.
+const SAVINGS_WINDOW = 200
 
 type SearchParams = {
   store?: string; category?: string; difficulty?: string; search?: string
-  limit?: string; sort?: string; maxPrice?: string; airfryer?: string
+  limit?: string; sort?: string; maxPrice?: string; airfryer?: string; ending?: string
 }
 
 interface HomeProps {
@@ -103,6 +107,29 @@ async function CheapestSection() {
   )
 }
 
+// Promocje wygasają i zabierają przepis ze sobą — zamiast to ukrywać, robimy z tego
+// argument: „ugotuj dziś, jutro tej ceny już nie będzie".
+async function EndingSoonSection() {
+  const recipes = await cachedEndingSoon()
+  if (recipes.length === 0) return null
+  return (
+    <section className="mb-10">
+      <div className="flex items-center gap-2 mb-1">
+        <Hourglass className="w-5 h-5 text-orange-500" />
+        <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>
+          Ostatnia szansa
+        </h2>
+      </div>
+      <p className="text-sm text-stone-500 mb-4">
+        Promocje kończą się dziś lub jutro — potem te przepisy znikną z serwisu.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {recipes.map((r: any, i: number) => <RecipeCard key={r.id} recipe={r} index={i} />)}
+      </div>
+    </section>
+  )
+}
+
 async function Results({ params, stores, categories }: { params: SearchParams; stores: Store[]; categories: Category[] }) {
   const supabase = await createClient()
   const hidden = await expiredRecipeIds()
@@ -122,6 +149,8 @@ async function Results({ params, stores, categories }: { params: SearchParams; s
 
   if (hidden.length > 0) query = query.not('id', 'in', `(${hidden.join(',')})`)
 
+  // „Największa oszczędność" liczy się z promo_products, więc nie da się jej posortować
+  // w SQL — pobieramy szersze okno i układamy w JS (patrz SAVINGS_WINDOW niżej).
   if (sort === 'cheap') query = query.order('price_total', { ascending: true, nullsFirst: false })
   else if (sort === 'fast') query = query.order('prep_time_min', { ascending: true, nullsFirst: false })
   else query = query.order('created_at', { ascending: false })
@@ -176,8 +205,14 @@ async function Results({ params, stores, categories }: { params: SearchParams; s
     query = query.or(orParts.join(','))
   }
 
+  // Sortowanie po oszczędności i filtr „Kończy się" działają na danych z promo_products,
+  // więc liczymy je w JS. Wymaga to szerszej puli — inaczej posortowalibyśmy albo
+  // odfiltrowali tylko przypadkową pierwszą stronę.
+  const needsWideWindow = sort === 'savings' || !!params.ending
+  const fetchLimit = needsWideWindow ? Math.max(limit, SAVINGS_WINDOW) : limit
+
   const [{ data: rawRecipes, count }, favEntries] = await Promise.all([
-    query.range(0, limit - 1),
+    query.range(0, fetchLimit - 1),
     favoriteCounts(),
   ])
   const favCounts = new Map(favEntries)
@@ -190,13 +225,34 @@ async function Results({ params, stores, categories }: { params: SearchParams; s
       favorite_count: favCounts.get(r.id) ?? 0,
     }))
   // To samo danie w kilku wariantach tytułu pokazujemy raz
-  const recipes = dedupeRecipes(mapped)
+  const dedupedAll = dedupeRecipes(mapped)
+  // Filtr „Kończy się" — po stronie JS, bo data wygaśnięcia jest w promo_products
+  const deduped = params.ending
+    ? dedupedAll.filter((r: any) => {
+        const end = soonestPromoEnd(r.promo_products)
+        return end != null && promoDaysLeft(end) <= ENDING_SOON_DAYS
+      })
+    : dedupedAll
 
-  const total = Math.max(0, (count ?? mapped.length) - (mapped.length - recipes.length))
+  const ordered =
+    sort === 'savings'
+      ? [...deduped].sort(
+          (a: any, b: any) =>
+            savingsPercent(b.price_total, b.promo_products) -
+            savingsPercent(a.price_total, a.promo_products)
+        )
+      : deduped
+  const recipes = ordered.slice(0, limit)
+
+  // Przy szerokim oknie znamy dokładną liczbę pasujących; inaczej opieramy się
+  // na liczniku z bazy skorygowanym o odrzucone duplikaty.
+  const total = needsWideWindow
+    ? ordered.length
+    : Math.max(0, (count ?? mapped.length) - (mapped.length - deduped.length))
   const hasMore = recipes.length < total
 
   const moreParams = new URLSearchParams()
-  for (const k of ['store', 'category', 'difficulty', 'search', 'sort', 'maxPrice', 'airfryer'] as const) {
+  for (const k of ['store', 'category', 'difficulty', 'search', 'sort', 'maxPrice', 'airfryer', 'ending'] as const) {
     if (params[k]) moreParams.set(k, params[k]!)
   }
   moreParams.set('limit', String(limit + PAGE_SIZE))
@@ -268,6 +324,11 @@ export default async function HomePage({ searchParams }: HomeProps) {
           {/* Przepis tygodnia pod filtrami */}
           <Suspense fallback={<FeaturedSkeleton />}>
             <FeaturedSection />
+          </Suspense>
+
+          {/* Pilność ponad siatką — wygasające promocje są najkrócej dostępne */}
+          <Suspense fallback={<SectionSkeleton height={320} />}>
+            <EndingSoonSection />
           </Suspense>
 
           <h2 className="text-xl font-bold text-stone-900 mb-5" style={{ fontFamily: 'var(--font-serif)' }}>Przepisy z promocji</h2>

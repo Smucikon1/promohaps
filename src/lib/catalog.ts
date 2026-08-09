@@ -2,6 +2,8 @@ import { unstable_cache } from 'next/cache'
 import { createPublicClient } from '@/lib/supabase/public'
 import { fetchRecipes } from '@/lib/recipeQuery'
 import { expiredRecipeIds, CATALOG_TAG } from '@/lib/promoVisibility'
+import { soonestPromoEnd } from '@/lib/savings'
+import { promoDaysLeft } from '@/lib/utils'
 import type { Store, Category } from '@/types'
 
 // Dane, które NIE zależą od filtrów: sklepy, kategorie, przepis na afiszu,
@@ -38,6 +40,27 @@ export const cachedCheapest = unstable_cache(
     return recipes
   },
   ['katalog-najtansze'],
+  OPTS
+)
+
+// „Ostatnia szansa" — przepisy, których promocja kończy się dziś lub jutro.
+// Wygaśnięcie ukrywa przepis z serwisu, więc to realnie ostatni moment na ugotowanie.
+export const ENDING_SOON_DAYS = 1
+
+export const cachedEndingSoon = unstable_cache(
+  async (): Promise<any[]> => {
+    const supabase = createPublicClient()
+    // Szersze okno niż wynik: filtrujemy po dacie dopiero w JS, bo najbliższy koniec
+    // promocji trzeba policzyć z listy promo_products, a nie z kolumny przepisu.
+    const { recipes } = await fetchRecipes(supabase, { sort: 'cheap', limit: 100 })
+    return recipes
+      .map((r: any) => ({ recipe: r, end: soonestPromoEnd(r.promo_products) }))
+      .filter((x) => x.end != null && promoDaysLeft(x.end!) <= ENDING_SOON_DAYS)
+      .sort((a, b) => a.end!.localeCompare(b.end!))
+      .slice(0, 6)
+      .map((x) => x.recipe)
+  },
+  ['katalog-konczace-sie'],
   OPTS
 )
 

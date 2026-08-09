@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { createClient } from '@/lib/supabase/server'
-import { totalSavings } from '@/lib/savings'
+import { savingsPercent } from '@/lib/savings'
+import { pricePerServing } from '@/lib/utils'
 
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
@@ -13,7 +14,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const supabase = await createClient()
   const { data: recipe } = await supabase
     .from('recipes')
-    .select('title, price_total, image_url, store:stores(name), promo_products(price_promo, price_regular)')
+    .select('title, price_total, servings, image_url, store:stores(name), promo_products(price_promo, price_regular, valid_from, valid_to)')
     .eq('slug', slug)
     .eq('is_published', true)
     .single()
@@ -21,9 +22,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const title = recipe?.title ?? 'Promohaps — przepisy z gazetek promocyjnych'
   const storeName = (recipe?.store as any)?.name as string | undefined
   const price = recipe?.price_total
-  const savings = totalSavings((recipe?.promo_products as any) ?? [])
-  const base = (price ?? 0) + savings
-  const percent = base > 0 && savings >= 0.5 ? Math.round((savings / base) * 100) : 0
+  const percent = savingsPercent(price, (recipe?.promo_products as any) ?? [])
+  const perServing = pricePerServing(price, recipe?.servings)
 
   return new ImageResponse(
     (
@@ -70,9 +70,16 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             </div>
           </div>
           <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+            {/* Cena za porcję na pierwszym planie — najmocniejszy argument w podglądzie linku */}
+            {perServing != null && (
+              <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 24px', background: '#e6f9f0', borderRadius: 20 }}>
+                <span style={{ fontSize: 18, color: '#0c7d49' }}>Za porcję</span>
+                <span style={{ fontSize: 40, fontWeight: 800, color: '#0c7d49' }}>{perServing.toFixed(2).replace('.', ',')} zł</span>
+              </div>
+            )}
             {typeof price === 'number' && (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: 18, color: '#78716c' }}>Koszt</span>
+                <span style={{ fontSize: 18, color: '#78716c' }}>Całość</span>
                 <span style={{ fontSize: 40, fontWeight: 800, color: '#1a1a1a' }}>{price.toFixed(2).replace('.', ',')} zł</span>
               </div>
             )}

@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Clock, Flame, Tag, UtensilsCrossed, Heart, Users } from 'lucide-react'
-import { formatPrice, formatTime, difficultyLabel, promoDaysLeftLabel, cn } from '@/lib/utils'
+import { formatPrice, formatTime, difficultyLabel, promoDaysLeftLabel, pricePerServing, cn } from '@/lib/utils'
 import { StoreLogo } from '@/components/recipe/StoreLogo'
-import { activePromos, totalSavings } from '@/lib/savings'
+import { activePromos, savingsPercent } from '@/lib/savings'
 import { FavoriteButton } from '@/components/recipe/FavoriteButton'
 import { PinterestSaveButton } from '@/components/recipe/PinterestSaveButton'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
@@ -25,7 +25,6 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
     ? promos.reduce((min, p) => (p.valid_to < min ? p.valid_to : min), promos[0].valid_to)
     : null
   const needsCard = promos.some((p) => p.condition_type === 'karta')
-  const savings = totalSavings(recipe.promo_products)
 
   return (
     <div className={cn('recipe-card group relative animate-fade-in-up', `stagger-${(index % 4) + 1}`)}>
@@ -145,20 +144,32 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
             )}
           </div>
 
-          {/* Cena całości (orientacyjna) + procent oszczędności w stosunku do cen standardowych */}
+          {/* Cena za porcję na pierwszym planie — to liczba, którą użytkownik porównuje
+              z obiadem na mieście. Koszt całości schodzi do roli uzupełnienia. */}
           {recipe.price_total && (() => {
-            const base = recipe.price_total + savings
-            const percent = base > 0 && savings >= 0.5 ? Math.round((savings / base) * 100) : 0
+            const percent = savingsPercent(recipe.price_total, recipe.promo_products)
+            const perServing = pricePerServing(recipe.price_total, recipe.servings)
             return (
               <div className="mt-3 pt-3 border-t border-stone-100">
                 <div className="flex items-end justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="block text-xs font-medium text-stone-500">Cena całości</span>
-                    <span className="block text-[10px] text-stone-400">orientacyjna</span>
+                    {perServing ? (
+                      <>
+                        <span className="block text-xs font-medium text-stone-500">Za porcję</span>
+                        <span className="block text-[10px] text-stone-400">
+                          całość {formatPrice(recipe.price_total)} · orientacyjnie
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block text-xs font-medium text-stone-500">Cena całości</span>
+                        <span className="block text-[10px] text-stone-400">orientacyjna</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex flex-col items-end flex-shrink-0">
                     <span className="text-xl font-bold text-amber-600" style={{ fontFamily: 'var(--font-serif)' }}>
-                      {formatPrice(recipe.price_total)}
+                      {formatPrice(perServing ?? recipe.price_total)}
                     </span>
                     {percent > 0 && (
                       <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-green-100 text-green-800 text-xs font-extrabold px-2 py-0.5 shadow-sm ring-1 ring-green-200">

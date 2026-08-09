@@ -3,9 +3,9 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Clock, Flame, ShoppingBag, PiggyBank, Users } from 'lucide-react'
-import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, isPromoExpired, promoDaysLeft, hasActivePromo } from '@/lib/utils'
-import { totalSavings } from '@/lib/savings'
+import { Clock, Flame, ShoppingBag, PiggyBank, Users, Wallet } from 'lucide-react'
+import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, isPromoExpired, promoDaysLeft, hasActivePromo, pricePerServing } from '@/lib/utils'
+import { totalSavings, savingsPercent } from '@/lib/savings'
 import { storeColor } from '@/lib/stores'
 import { ShoppingList } from '@/components/recipe/ShoppingList'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
@@ -77,6 +77,8 @@ export default async function RecipePage({ params }: Props) {
       : daysLeft === 0 ? 'kończy się dziś' : daysLeft === 1 ? 'kończy się jutro' : `kończy się za ${daysLeft} dni`
   const needsCard = activePromos.some((p: any) => p.condition_type === 'karta')
   const savings = totalSavings(normalized.promo_products)
+  const percent = savingsPercent(normalized.price_total, normalized.promo_products)
+  const perServing = pricePerServing(normalized.price_total, normalized.servings)
 
   // Powiązane przepisy z tego samego sklepu
   const { data: relatedRaw } = await supabase
@@ -261,33 +263,32 @@ export default async function RecipePage({ params }: Props) {
               <div className="text-xs text-stone-500">Koszt <span className="text-stone-400">(orientacyjny)</span></div>
             </div>
           )}
-          {(() => {
-            const base = (normalized.price_total ?? 0) + savings
-            const percent = base > 0 && savings >= 0.5 ? Math.round((savings / base) * 100) : 0
-            return percent > 0 ? (
-              <div className="flex-1 min-w-[80px] px-4 text-center">
-                <PiggyBank className="w-5 h-5 text-green-600 mx-auto mb-1" />
-                <div className="font-extrabold text-green-700 text-lg leading-tight">−{percent}%</div>
-                <div className="text-xs text-stone-500">taniej z gazetki</div>
-              </div>
-            ) : null
-          })()}
+          {perServing && (
+            <div className="flex-1 min-w-[80px] px-4 text-center">
+              <Wallet className="w-5 h-5 text-[#12b76a] mx-auto mb-1" />
+              <div className="font-bold text-[#12b76a] text-lg leading-tight">{formatPrice(perServing)}</div>
+              <div className="text-xs text-stone-500">za porcję</div>
+            </div>
+          )}
+          {percent > 0 && (
+            <div className="flex-1 min-w-[80px] px-4 text-center">
+              <PiggyBank className="w-5 h-5 text-green-600 mx-auto mb-1" />
+              <div className="font-extrabold text-green-700 text-lg leading-tight">−{percent}%</div>
+              <div className="text-xs text-stone-500">taniej z gazetki</div>
+            </div>
+          )}
         </div>
 
-        {(() => {
-          const base = (normalized.price_total ?? 0) + savings
-          const percent = base > 0 && savings >= 0.5 ? Math.round((savings / base) * 100) : 0
-          if (percent === 0) return null
-          return (
-            <div className="mb-8 flex items-center gap-3 rounded-2xl bg-green-100 border border-green-200 px-4 py-3 shadow-sm">
-              <PiggyBank className="w-6 h-6 text-green-700 flex-shrink-0" />
-              <p className="text-sm text-green-900">
-                Kupując produkty z gazetki, ten przepis wychodzi Cię o{' '}
-                <span className="font-extrabold text-base">−{percent}%</span> taniej niż w standardowej cenie.
-              </p>
-            </div>
-          )
-        })()}
+        {percent > 0 && (
+          <div className="mb-8 flex items-center gap-3 rounded-2xl bg-green-100 border border-green-200 px-4 py-3 shadow-sm">
+            <PiggyBank className="w-6 h-6 text-green-700 flex-shrink-0" />
+            <p className="text-sm text-green-900">
+              Kupując produkty z gazetki, ten przepis wychodzi Cię o{' '}
+              <span className="font-extrabold text-base">−{percent}%</span> taniej niż w standardowej cenie
+              {perServing && <> — to <span className="font-extrabold">{formatPrice(perServing)} za porcję</span></>}.
+            </p>
+          </div>
+        )}
 
         {/* Krótka nota o cenach — brak ryzyka roszczeń */}
         {normalized.price_total && (

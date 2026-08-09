@@ -20,3 +20,24 @@ export function totalSavings(promos?: PromoProduct[] | null): number {
     return sum
   }, 0)
 }
+
+// Data najwcześniej wygasającej aktywnej promocji — wyznacza, jak długo przepis
+// jest jeszcze aktualny (wygaśnięcie choćby jednej promocji ukrywa cały przepis).
+export function soonestPromoEnd(promos?: PromoProduct[] | null): string | null {
+  const active = activePromos(promos)
+  if (active.length === 0) return null
+  return active.reduce((min, p) => (p.valid_to < min ? p.valid_to : min), active[0].valid_to)
+}
+
+// Procent oszczędności względem ceny bez promocji (price_total już jest po obniżce,
+// więc bazą jest price_total + oszczędność). Poniżej 0,5 zł nie pokazujemy —
+// zaokrąglenia dawałyby mylące „−1%".
+export function savingsPercent(
+  priceTotal: number | null | undefined,
+  promos?: PromoProduct[] | null
+): number {
+  const saved = totalSavings(promos)
+  if (saved < 0.5) return 0
+  const base = (priceTotal ?? 0) + saved
+  return base > 0 ? Math.round((saved / base) * 100) : 0
+}

@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Check, ArrowDownUp, X } from 'lucide-react'
+import { ChevronDown, Check, ArrowDownUp, X, Hourglass } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { sortByPopularity } from '@/lib/stores'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
@@ -20,6 +20,7 @@ interface FiltersProps {
 
 const SORT_OPTIONS = [
   { value: 'cheap', label: 'Najtańsze' },
+  { value: 'savings', label: 'Największa oszczędność' },
   { value: 'new', label: 'Najnowsze' },
   { value: 'fast', label: 'Najszybsze' },
 ]
@@ -210,6 +211,7 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
   const activeSort = params.get('sort') ?? 'cheap'
   const activeMaxPrice = params.get('maxPrice')
   const activeAirfryer = params.get('airfryer')
+  const activeEnding = params.get('ending')
 
   const setParam = useCallback(
     (key: string, value: string | null) => {
@@ -367,6 +369,14 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
               ))}
             </>
           )}
+        />
+
+        {/* Kończy się — toggle na przepisy, których promocja wygasa dziś lub jutro */}
+        <FilterChip
+          label="Kończy się"
+          active={!!activeEnding}
+          icon={<Hourglass className={cn('w-4 h-4', !activeEnding && 'text-orange-500')} />}
+          onClick={() => setParam('ending', activeEnding ? null : '1')}
         />
 
         {/* Airfryer — czysty toggle bez dropdownu */}
