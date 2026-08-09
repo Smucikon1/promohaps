@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Clock, Flame, ShoppingBag, PiggyBank, Users, Wallet } from 'lucide-react'
-import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, promoDaysLeft, hasActivePromo, pricePerServing } from '@/lib/utils'
+import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, promoDaysLeft, hasActivePromo } from '@/lib/utils'
 import { totalSavings, savingsPercent, regularPrice } from '@/lib/savings'
 import { storeColor } from '@/lib/stores'
 import { ShoppingList } from '@/components/recipe/ShoppingList'
@@ -85,7 +85,6 @@ export default async function RecipePage({ params }: Props) {
   // Po wygaśnięciu promocji cena promocyjna jest już nieosiągalna — pokazujemy
   // koszt w cenach zwykłych, żeby nikt nie poszedł do sklepu z nieaktualną kwotą.
   const shownPrice = promoLive ? normalized.price_total : regularPrice(normalized.price_total, normalized.promo_products)
-  const perServing = pricePerServing(shownPrice, normalized.servings)
 
   // Powiązane przepisy z tego samego sklepu
   const { data: relatedRaw } = await supabase
@@ -282,15 +281,8 @@ export default async function RecipePage({ params }: Props) {
               <ShoppingBag className="w-5 h-5 text-amber-500 mx-auto mb-1" />
               <div className="font-semibold text-stone-800">{formatPrice(shownPrice)}</div>
               <div className="text-xs text-stone-500">
-                Koszt <span className="text-stone-400">({promoLive ? 'orientacyjny' : 'bez promocji'})</span>
+                Zakupy <span className="text-stone-400">({promoLive ? 'orientacyjnie' : 'bez promocji'})</span>
               </div>
-            </div>
-          )}
-          {perServing && (
-            <div className="flex-1 min-w-[80px] px-4 text-center">
-              <Wallet className="w-5 h-5 text-[#12b76a] mx-auto mb-1" />
-              <div className="font-bold text-[#12b76a] text-lg leading-tight">{formatPrice(perServing)}</div>
-              <div className="text-xs text-stone-500">za porcję</div>
             </div>
           )}
           {percent > 0 && (
@@ -307,8 +299,7 @@ export default async function RecipePage({ params }: Props) {
             <PiggyBank className="w-6 h-6 text-green-700 flex-shrink-0" />
             <p className="text-sm text-green-900">
               Kupując produkty z gazetki, ten przepis wychodzi Cię o{' '}
-              <span className="font-extrabold text-base">−{percent}%</span> taniej niż w standardowej cenie
-              {perServing && <> — to <span className="font-extrabold">{formatPrice(perServing)} za porcję</span></>}.
+              <span className="font-extrabold text-base">−{percent}%</span> taniej niż w standardowej cenie.
             </p>
           </div>
         )}

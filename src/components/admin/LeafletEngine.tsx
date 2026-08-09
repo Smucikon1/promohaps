@@ -156,7 +156,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const [theme, setTheme] = useState('')
   const [generating, setGenerating] = useState(false)
   const [batchStatus, setBatchStatus] = useState('')
-  const [drafts, setDrafts] = useState<{ id: string; title: string; editUrl: string }[]>([])
+  const [drafts, setDrafts] = useState<{ id: string; title: string; editUrl: string; hasImage?: boolean }[]>([])
+  // Nieudane zdjęcie nie jest błędem generacji — przepis powstał, więc osobny, łagodniejszy komunikat
+  const [imageNotice, setImageNotice] = useState('')
   // Produkty użyte w dotychczas wygenerowanych przepisach (współdzielenie zakupów)
   const [usedProducts, setUsedProducts] = useState<string[]>([])
   // Zapisana pula promocji dla sklepu (recipe_id=null, aktywne) — do generowania w innej sesji
@@ -438,7 +440,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     themeArg: string,
     used: string[],
     promoOverride?: any[]
-  ): Promise<{ draft: { id: string; title: string; editUrl: string }; used: string[] }> => {
+  ): Promise<{ draft: { id: string; title: string; editUrl: string; hasImage: boolean }; used: string[]; imageWarning?: string }> => {
     const res = await fetch('/api/generate-recipe-draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -454,8 +456,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     const data = isJson ? await res.json().catch(() => ({})) : {}
     if (!res.ok) throw new Error(data.error ?? (res.status === 504 ? 'Timeout serwera — spróbuj ponownie.' : `Błąd (${res.status}).`))
     return {
-      draft: { id: data.recipeId, title: data.title, editUrl: data.editUrl },
+      draft: { id: data.recipeId, title: data.title, editUrl: data.editUrl, hasImage: !!data.hasImage },
       used: Array.from(new Set([...used, ...(data.usedProducts ?? [])])),
+      imageWarning: data.imageWarning ?? undefined,
     }
   }
 
@@ -467,6 +470,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
       const r = await generateOne(theme, usedProducts)
       setDrafts((d) => [r.draft, ...d])
       setUsedProducts(r.used)
+      setImageNotice(r.imageWarning ?? '')
     } catch (err: any) {
       setError(`Błąd: ${err?.message ?? 'nieznany'}`)
     } finally {
@@ -483,6 +487,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     const pool = products.filter((p) => p.name && p.price_promo != null)
     let used = [...usedProducts]
     let failed = 0
+    let noImage = 0
     for (let i = 0; i < SET_SPECS.length; i++) {
       const spec = SET_SPECS[i]
       setBatchStatus(`Generuję zestaw: ${i + 1}/${SET_SPECS.length} — ${spec.label}…`)
@@ -493,11 +498,13 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         const r = await generateOne(spec.theme, used, payloadFrom(selected as Product[]))
         used = r.used
         setDrafts((d) => [r.draft, ...d]) // pokazuj na bieżąco
+        if (r.imageWarning) noImage++
       } catch {
         failed++
       }
     }
     setUsedProducts(used)
+    setImageNotice(noImage > 0 ? `${noImage} z ${SET_SPECS.length} przepisów powstało bez zdjęcia — dodasz je ręcznie przy akceptacji.` : '')
     setBatchStatus('')
     setGenerating(false)
     if (failed > 0) setError(`Zestaw gotowy, ale ${failed} z ${SET_SPECS.length} przepisów się nie udało — spróbuj wygenerować je pojedynczo.`)
@@ -699,16 +706,29 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
               {batchStatus} (nie zamykaj strony)
             </p>
           )}
-          <p className="text-xs text-stone-400">Przepisy powstają na bazie produktów z gazetki i zapisują się jako niepublikowane szkice. Zestaw 12 tworzy po jednym przepisie na każdy filtr — to potrwa kilka minut. Zdjęcia dodasz przy akceptacji.</p>
+          <p className="text-xs text-stone-400">Przepisy powstają na bazie produktów z gazetki i zapisują się jako niepublikowane szkice. Zestaw 12 tworzy po jednym przepisie na każdy filtr — to potrwa kilka minut. Zdjęcie generuje się automatycznie; jeśli się nie uda, podmienisz je przy akceptacji.</p>
+
+          {imageNotice && (
+            <p className="text-xs text-stone-500 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
+              Przepis zapisany, ale bez zdjęcia: {imageNotice}
+            </p>
+          )}
 
           {drafts.length > 0 && (
             <div className="space-y-2 pt-2 border-t border-stone-50">
               <p className="text-sm font-medium text-stone-700">Wygenerowane szkice do akceptacji:</p>
               {drafts.map((d) => (
-                <Link key={d.id} href={d.editUrl ?? `/admin/przepisy/${d.id}`}
-                  className="flex items-center gap-2 text-sm text-amber-600 hover:text-amber-700">
-                  <ExternalLink className="w-4 h-4" /> {d.title} — otwórz do akceptacji
-                </Link>
+                <div key={d.id} className="flex items-center gap-2 flex-wrap">
+                  <Link href={d.editUrl ?? `/admin/przepisy/${d.id}`}
+                    className="flex items-center gap-2 text-sm text-amber-600 hover:text-amber-700">
+                    <ExternalLink className="w-4 h-4" /> {d.title} — otwórz do akceptacji
+                  </Link>
+                  {d.hasImage === false && (
+                    <span className="text-[11px] font-medium text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full">
+                      bez zdjęcia
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
           )}

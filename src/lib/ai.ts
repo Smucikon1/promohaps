@@ -6,6 +6,40 @@ import Anthropic from '@anthropic-ai/sdk'
 export const MAX_RECIPE_PRICE = 30
 export const MAX_INGREDIENTS = 10
 
+// Składniki „z szafki" — nie doliczamy ich do rachunku, bo nikt nie idzie po sól
+// do sklepu dla jednego obiadu. Lista musi być zamknięta: bez niej model kusi się,
+// żeby zmieścić się w limicie, wpisując price: null drogiemu mięsu.
+// Dopasowanie po CAŁYCH słowach, nie po fragmentach: „makaron" zawiera „mak",
+// więc dopasowanie fragmentem uznałoby makaron za darmowy dodatek z szafki
+// i zaniżyło kwotę pokazaną użytkownikowi.
+const PANTRY_WORDS = new Set([
+  'sol', 'soli', 'pieprz', 'pieprzu', 'cukier', 'cukru', 'maka', 'maki',
+  'olej', 'oleju', 'oliwa', 'oliwy', 'ocet', 'octu', 'woda', 'wody',
+  'przyprawa', 'przyprawy', 'oregano', 'ziola', 'ziol', 'majeranek', 'majeranku',
+  'curry', 'tymianek', 'tymianku', 'laurowy', 'laurowe', 'kminek', 'kminku',
+  'kurkuma', 'kurkumy', 'cynamon', 'cynamonu', 'gorczyca', 'gorczycy', 'soda',
+])
+
+// Frazy, w których pojedyncze słowo byłoby zbyt ryzykowne: samo „mielona" złapałoby
+// „wołowinę mieloną", a sama „papryka" — świeżą paprykę za kilka złotych.
+const PANTRY_PHRASES = [
+  'papryka slodka', 'papryka mielona', 'papryka wedzona', 'papryka ostra',
+  'proszek do pieczenia', 'ziola prowansalskie',
+]
+
+// Ujednolica polskie znaki, żeby „sól" i „sol" trafiały w ten sam wzorzec
+function normalize(s: string): string {
+  return s.toLowerCase()
+    .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l')
+    .replace(/ń/g, 'n').replace(/ó/g, 'o').replace(/ś/g, 's').replace(/ż|ź/g, 'z')
+}
+
+function isPantryStaple(name: string): boolean {
+  const n = normalize(name)
+  if (PANTRY_PHRASES.some((p) => n.includes(p))) return true
+  return n.split(/[^a-z0-9]+/).some((w) => PANTRY_WORDS.has(w))
+}
+
 function client() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('Brak ANTHROPIC_API_KEY w konfiguracji serwera.')
@@ -69,6 +103,8 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
       price_total: { type: 'number' },
       meta_title: { type: 'string' },
       meta_description: { type: 'string' },
+      // Prompt po angielsku do generatora zdjęć (Flux rozumie angielski znacznie lepiej)
+      image_prompt: { type: 'string' },
       ingredients: {
         type: 'array',
         items: {
@@ -107,7 +143,7 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     required: [
       'title', 'slug', 'description', 'store_slug', 'category_slugs', 'prep_time_min',
       'difficulty', 'servings', 'price_total', 'meta_title', 'meta_description',
-      'ingredients', 'steps', 'promos',
+      'image_prompt', 'ingredients', 'steps', 'promos',
     ],
     additionalProperties: false,
   }
@@ -117,12 +153,24 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     'Tworzysz apetyczne, realistyczne przepisy domowej kuchni z tanich, dostępnych składników.',
     'is_promo_product: true dla składników z promocji/gazetki; meta_title ~60 zn., meta_description ~155 zn.;',
     '',
-    'CENY (bardzo ważne):',
-    '- price składnika = cena CAŁEGO OPAKOWANIA/produktu tak jak sprzedaje go sklep,',
-    '  a NIE cena za zużytą porcję ani za sztukę. Kupujący płaci za całe opakowanie.',
+    'CENY — MYŚL O PARAGONIE, NIE O TALERZU (reguła nadrzędna):',
+    'price_total to kwota, jaką użytkownik zapłaci przy kasie, kupując wszystko z listy.',
+    'Dlatego price KAŻDEGO składnika = cena CAŁEGO OPAKOWANIA ze sklepowej półki.',
+    '  Przykład: przepis używa 200 g twarogu, ale w sklepie leży kostka 250 g za 4,99 zł',
+    '  → price = 4.99 (cena kostki), NIE 3,99 za „200 g". Reszta zostaje w lodówce, ale zapłacone jest 4,99.',
+    'Nigdy nie licz cen „za zużytą część", „za sztukę z opakowania" ani proporcjonalnie do gramatury.',
+    'amount/unit opisuj tak, jak produkt leży na półce (np. „500 g", „1 opakowanie", „6 sztuk"),',
+    '  żeby użytkownik mógł porównać cenę z etykietą w sklepie.',
     '- dla składników z gazetki użyj dokładnie ceny promocyjnej z danych wejściowych (price_promo);',
     '- dla pozostałych podaj realistyczną cenę typowego opakowania w polskim sklepie;',
-    '- price_total = suma cen opakowań wszystkich składników (ile wydasz kupując wszystko do przepisu).',
+    '',
+    'PRODUKTY „Z SZAFKI" — price: null (nie doliczaj ich do rachunku):',
+    '  sól, pieprz, cukier, mąka, olej, ocet, woda oraz typowe suszone przyprawy',
+    '  (papryka, oregano, zioła prowansalskie, majeranek, curry, tymianek, liść laurowy).',
+    '  Tego każdy ma w domu i nikt nie idzie po to do sklepu dla jednego obiadu.',
+    '  Ta lista jest ZAMKNIĘTA — każdy inny składnik MUSI mieć realną cenę opakowania.',
+    '  Nie wpisuj null masłu, jajkom, śmietanie, serowi, świeżym ziołom ani niczemu spoza listy.',
+    '',
     'gdy condition_type="karta", cena wymaga karty/aplikacji lojalnościowej — użyj tej ceny opakowania;',
     'w polach promos KOPIUJ DOKŁADNIE z danych wejściowych: name, ceny, condition_type, condition_note,',
     'min_quantity oraz valid_from i valid_to (nie wymyślaj dat — przy braku daj null).',
@@ -137,11 +185,14 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     'ANTY-UBOGI PRZEPIS: mimo taniości danie ma być pełnowartościowe — musi mieć źródło białka (mięso/ryba/strączki/nabiał/jajka),',
     '  bazę węglowodanową (ziemniaki/ryż/makaron/kasza/pieczywo) i warzywa/owoce. Nie tylko sama sałatka z pomidora.',
     '',
-    'BUDŻET — TWARDY LIMIT 30 zł (najważniejsza reguła serwisu):',
-    '  suma price wszystkich składników MUSI wyjść ≤ 30 zł. Bez wyjątków.',
-    '  Zanim zwrócisz JSON: ZSUMUJ price wszystkich ingredients. Jeśli > 30 zł — przerób przepis, nie zaniżaj cen.',
+    'BUDŻET — TWARDY LIMIT 30 zł NA PARAGONIE (najważniejsza reguła serwisu):',
+    '  suma price wszystkich składników (bez tych z price: null) MUSI wyjść ≤ 30 zł. Bez wyjątków.',
+    '  Zanim zwrócisz JSON: ZSUMUJ price wszystkich ingredients. Jeśli > 30 zł — przerób przepis.',
+    '  Nie mieść się w limicie przez zaniżanie cen ani przez wpisywanie null poza listą „z szafki".',
     '  Jak się zmieścić uczciwie: tańsze białko (mielone/udka/jaja/strączki zamiast piersi, schabu, łososia),',
     '  mniej pozycji spoza gazetki, oprzyj danie na 2–3 produktach promocyjnych zamiast pięciu.',
+    'PORCJE dobierz do wielkości kupionych opakowań, nie odwrotnie — skoro kupujesz 500 g mięsa',
+    '  i kilogram ziemniaków, to wychodzi obiad dla 4 osób, a nie dla 2. Typowo servings = 4.',
     'PROSTOTA (równie ważna jak cena): 5–8 składników łącznie, maksymalnie 10.',
     '  Zwykłe produkty z każdego sklepu — żadnych niszowych, drogich czy „wymyślnych" dodatków',
     '  (bez pinii, świeżej bazylii poza sezonem, parmezanu, wina do gotowania, egzotycznych przypraw).',
@@ -164,6 +215,13 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     '- RÓŻNICUJ: białko (drób / wieprzowina / ryba / strączki / jajka / wege) oraz typ dania',
     '  (jednogarnkowe, pieczone, sałatka, zupa, zapiekanka, patelnia, airfryer) — za każdym razem inny zestaw;',
     '- trzymaj się zadanego kierunku (kuchnia, technika, pora posiłku) z pola „wytyczne".',
+    '',
+    'ZDJĘCIE (image_prompt) — pisz PO ANGIELSKU, 1 zdanie, opis gotowego dania na talerzu:',
+    '  co widać (danie + kluczowe składniki), naczynie, tło, światło. Wzór:',
+    '  "overhead shot of roast pork loin sliced on a white plate with roasted potatoes and celery,',
+    '   fresh parsley, rustic wooden table, soft natural window light, shallow depth of field".',
+    '  Bez ludzi, bez rąk, bez napisów i logotypów. Ma wyglądać jak zdjęcie z bloga kulinarnego,',
+    '  nie jak render 3D ani zdjęcie stockowe z lat 2000.',
   ].join('\n')
 
   const payload = {
@@ -213,11 +271,20 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
 
     const overBudget = recipe.price_total > MAX_RECIPE_PRICE
     const tooManyIngredients = (recipe.ingredients ?? []).length > MAX_INGREDIENTS
-    if (!overBudget && !tooManyIngredients) return recipe
+    // Bez ceny może zostać wyłącznie sól/pieprz/olej itp. Inaczej rachunek pokazany
+    // użytkownikowi byłby niższy od tego, co naprawdę zapłaci przy kasie.
+    const unpricedNonStaples = (recipe.ingredients ?? [])
+      .filter((i: any) => typeof i?.price !== 'number' && i?.name && !isPantryStaple(i.name))
+      .map((i: any) => i.name)
+
+    if (!overBudget && !tooManyIngredients && unpricedNonStaples.length === 0) return recipe
 
     const problems = [
       overBudget ? `suma wyszła ${recipe.price_total.toFixed(2)} zł (limit ${MAX_RECIPE_PRICE} zł)` : '',
       tooManyIngredients ? `użyto ${recipe.ingredients.length} składników (limit ${MAX_INGREDIENTS})` : '',
+      unpricedNonStaples.length
+        ? `brak ceny przy składnikach spoza listy „z szafki": ${unpricedNonStaples.join(', ')} — każdy z nich musi mieć cenę opakowania`
+        : '',
     ].filter(Boolean).join(' oraz ')
 
     if (attempt === 1) throw new Error(`Nie udało się zmieścić w limitach: ${problems}. Spróbuj ponownie.`)

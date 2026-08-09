@@ -4,7 +4,7 @@ import { PiggyBank, Recycle, Users, ShoppingBasket } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { dedupeRecipes } from '@/lib/recipeDedupe'
-import { hasActivePromo, formatPrice, pricePerServing } from '@/lib/utils'
+import { hasActivePromo, formatPrice } from '@/lib/utils'
 import { buildWeeklySet, type SetRecipe } from '@/lib/weeklySet'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { AddSetToList } from '@/components/recipe/AddSetToList'
@@ -59,11 +59,11 @@ export default async function WeeklySetPage() {
     byStore.get(key)!.push(r)
   }
 
-  // Z każdego sklepu bierzemy najlepszy zestaw, pokazujemy ten z najniższą ceną za porcję
+  // Z każdego sklepu bierzemy najlepszy zestaw, pokazujemy ten o najniższym koszcie zakupów
   const sets = [...byStore.values()]
     .map((list) => buildWeeklySet(list, SET_SIZE))
     .filter((s): s is NonNullable<typeof s> => s != null && s.recipes.length >= 3)
-    .sort((a, b) => a.cost / Math.max(1, a.portions) - b.cost / Math.max(1, b.portions))
+    .sort((a, b) => a.cost - b.cost)
 
   const set = sets[0]
 
@@ -86,7 +86,6 @@ export default async function WeeklySetPage() {
   }
 
   const store = (set.recipes[0] as any)?.store
-  const perPortion = set.portions > 0 ? set.cost / set.portions : null
   const totalSaved = set.sharedSavings + set.promoSavings
 
   return (
@@ -116,14 +115,12 @@ export default async function WeeklySetPage() {
             {formatPrice(set.cost)}
           </div>
         </div>
-        {perPortion && (
-          <div className="bg-white rounded-2xl border border-stone-100 p-4">
-            <div className="text-xs text-stone-500 mb-1">Za porcję</div>
-            <div className="text-2xl font-bold text-[#12b76a]" style={{ fontFamily: 'var(--font-serif)' }}>
-              {formatPrice(Math.round(perPortion * 100) / 100)}
-            </div>
+        <div className="bg-white rounded-2xl border border-stone-100 p-4">
+          <div className="text-xs text-stone-500 mb-1">Obiadów</div>
+          <div className="text-2xl font-bold text-[#12b76a]" style={{ fontFamily: 'var(--font-serif)' }}>
+            {set.recipes.length}
           </div>
-        )}
+        </div>
         {set.sharedSavings >= 0.5 && (
           <div className="bg-green-50 rounded-2xl border border-green-200 p-4">
             <div className="text-xs text-green-700 mb-1 flex items-center gap-1">

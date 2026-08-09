@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateRecipeJson } from '@/lib/ai'
+import { generateRecipeImage } from '@/lib/recipeImage'
 import { checkLimit } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
@@ -56,11 +57,15 @@ export async function POST(request: Request) {
   const { data: slugTaken } = await supabase.from('recipes').select('id').eq('slug', slug).maybeSingle()
   if (slugTaken) slug = `${slug}-${Date.now().toString(36).slice(-4)}`
 
+  // Zdjęcie generujemy przed zapisem, żeby przepis od razu trafił do bazy kompletny.
+  // Porażka nie przerywa niczego — przepis powstaje bez zdjęcia, a admin dostaje ostrzeżenie.
+  const image = await generateRecipeImage(recipe.image_prompt ?? '', slug, supabase)
+
   const payload = {
     title: recipe.title ?? 'Bez tytułu',
     slug,
     description: recipe.description ?? null,
-    image_url: '',
+    image_url: image.url ?? '',
     store_id: store.id,
     prep_time_min: recipe.prep_time_min ?? null,
     difficulty: recipe.difficulty ?? 'latwy',
@@ -142,5 +147,7 @@ export async function POST(request: Request) {
     editUrl: `/admin/przepisy/${recipeId}`,
     // Produkty użyte w tym przepisie — kolejne przepisy mogą je współdzielić
     usedProducts: promos.map((p: any) => p.name).filter(Boolean),
+    hasImage: !!image.url,
+    imageWarning: image.warning ?? null,
   })
 }

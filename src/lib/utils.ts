@@ -13,16 +13,6 @@ export function formatPrice(price: number | null): string {
   }).format(price)
 }
 
-// Cena za porcję — dla serwisu o oszczędzaniu czytelniejsza niż koszt całego
-// przepisu („7,50 zł/porcja" zamiast „30 zł"). Zwraca null, gdy brak danych.
-export function pricePerServing(
-  priceTotal: number | null | undefined,
-  servings: number | null | undefined
-): number | null {
-  if (!priceTotal || !servings || servings < 1) return null
-  return Math.round((priceTotal / servings) * 100) / 100
-}
-
 export function formatTime(minutes: number | null): string {
   if (!minutes) return '—'
   if (minutes < 60) return `${minutes} min`

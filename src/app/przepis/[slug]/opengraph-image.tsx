@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { createClient } from '@/lib/supabase/server'
 import { savingsPercent, regularPrice } from '@/lib/savings'
-import { pricePerServing, hasActivePromo } from '@/lib/utils'
+import { hasActivePromo } from '@/lib/utils'
 
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
@@ -25,7 +25,6 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   // Po wygaśnięciu promocji nie wolno rozsyłać w social mediach nieaktualnej ceny
   const price = hasActivePromo(promos) ? recipe?.price_total : regularPrice(recipe?.price_total, promos)
   const percent = savingsPercent(recipe?.price_total, promos)
-  const perServing = pricePerServing(price, recipe?.servings)
 
   return new ImageResponse(
     (
@@ -72,17 +71,12 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             </div>
           </div>
           <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-            {/* Cena za porcję na pierwszym planie — najmocniejszy argument w podglądzie linku */}
-            {perServing != null && (
-              <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 24px', background: '#e6f9f0', borderRadius: 20 }}>
-                <span style={{ fontSize: 18, color: '#0c7d49' }}>Za porcję</span>
-                <span style={{ fontSize: 40, fontWeight: 800, color: '#0c7d49' }}>{perServing.toFixed(2).replace('.', ',')} zł</span>
-              </div>
-            )}
+            {/* Koszt zakupów na pierwszym planie — to jedyna kwota, którą użytkownik
+                realnie zapłaci przy kasie */}
             {typeof price === 'number' && (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: 18, color: '#78716c' }}>Całość</span>
-                <span style={{ fontSize: 40, fontWeight: 800, color: '#1a1a1a' }}>{price.toFixed(2).replace('.', ',')} zł</span>
+              <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 24px', background: '#e6f9f0', borderRadius: 20 }}>
+                <span style={{ fontSize: 18, color: '#0c7d49' }}>Zakupy</span>
+                <span style={{ fontSize: 40, fontWeight: 800, color: '#0c7d49' }}>{price.toFixed(2).replace('.', ',')} zł</span>
               </div>
             )}
             {percent > 0 && (
