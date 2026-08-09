@@ -37,6 +37,9 @@ Kolejność ma znaczenie: najpierw zabezpiecz bazę, potem wdróż.
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - `ANTHROPIC_API_KEY` (NOWY klucz z pkt 2)
+  - `REPLICATE_API_TOKEN` — opcjonalny, zdjęcia dań (replicate.com/account/api-tokens).
+    Bez niego przepisy powstają bez zdjęcia, a w panelu pojawia się znacznik „bez zdjęcia".
+    Zdjęcia są ważne: bez nich odpada Pinterest i Google Discover, a kafelki mają niższą klikalność.
   - `NEXT_PUBLIC_SITE_URL` (uzupełnij po pkt 5)
 - [ ] Deploy.
 
