@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { createClient } from '@/lib/supabase/server'
-import { savingsPercent } from '@/lib/savings'
-import { pricePerServing } from '@/lib/utils'
+import { savingsPercent, regularPrice } from '@/lib/savings'
+import { pricePerServing, hasActivePromo } from '@/lib/utils'
 
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
@@ -21,8 +21,10 @@ export default async function Image({ params }: { params: Promise<{ slug: string
 
   const title = recipe?.title ?? 'Promohaps — przepisy z gazetek promocyjnych'
   const storeName = (recipe?.store as any)?.name as string | undefined
-  const price = recipe?.price_total
-  const percent = savingsPercent(price, (recipe?.promo_products as any) ?? [])
+  const promos = (recipe?.promo_products as any) ?? []
+  // Po wygaśnięciu promocji nie wolno rozsyłać w social mediach nieaktualnej ceny
+  const price = hasActivePromo(promos) ? recipe?.price_total : regularPrice(recipe?.price_total, promos)
+  const percent = savingsPercent(recipe?.price_total, promos)
   const perServing = pricePerServing(price, recipe?.servings)
 
   return new ImageResponse(

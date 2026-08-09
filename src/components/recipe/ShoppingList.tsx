@@ -11,28 +11,42 @@ interface ShoppingListProps {
   recipeId: string
   ingredients: Ingredient[]
   promoProducts?: PromoProduct[]
+  // false = promocje wygasły; ceny promocyjne przestają obowiązywać
+  promoLive?: boolean
 }
 
-export function ShoppingList({ recipeId, ingredients, promoProducts = [] }: ShoppingListProps) {
+export function ShoppingList({ recipeId, ingredients, promoProducts = [], promoLive = true }: ShoppingListProps) {
   const { items, loaded, exists, addAll, removeAll, syncMeta, toggleItem, resetList, checkedCount } =
     useShoppingList(recipeId)
   const [justAdded, setJustAdded] = useState(false)
 
   // Definicja składników: produkty z gazetki (wyróżnione) + zwykłe składniki
   const defs = useMemo<Omit<ShoppingItem, 'checked'>[]>(() => {
+    // Po wygaśnięciu promocji cena promocyjna jest nieosiągalna — pokazujemy regularną
+    // i zdejmujemy oznaczenia „z gazetki" wraz z warunkami (karta, wielosztuka),
+    // bo dotyczyły tamtej, już nieobowiązującej oferty.
     const promos = promoProducts.map((p) => ({
       id: p.id, name: p.name, amount: null, unit: null,
-      isPromo: true, price: p.price_promo, priceRegular: p.price_regular, fixedPrice: true,
-      conditionType: p.condition_type ?? null,
-      conditionNote: p.condition_note ?? null,
-      minQuantity: p.min_quantity ?? null,
+      isPromo: promoLive,
+      price: promoLive ? p.price_promo : (p.price_regular ?? null),
+      priceRegular: promoLive ? p.price_regular : null,
+      fixedPrice: true,
+      conditionType: promoLive ? (p.condition_type ?? null) : null,
+      conditionNote: promoLive ? (p.condition_note ?? null) : null,
+      minQuantity: promoLive ? (p.min_quantity ?? null) : null,
     }))
+    // Ceny składników są policzone po cenach promocyjnych, a cen regularnych na tym
+    // poziomie nie znamy. Po wygaśnięciu ukrywamy je zamiast zgadywać — orientacyjną
+    // sumę bez promocji użytkownik widzi w pasku wartości nad listą.
     const regular = ingredients.map((i) => ({
       id: i.id, name: i.name, amount: i.amount, unit: i.unit,
-      isPromo: !!i.is_promo_product, price: i.price ?? null, priceRegular: null, fixedPrice: false,
+      isPromo: promoLive && !!i.is_promo_product,
+      price: promoLive ? (i.price ?? null) : null,
+      priceRegular: null,
+      fixedPrice: false,
     }))
     return [...promos, ...regular]
-  }, [ingredients, promoProducts])
+  }, [ingredients, promoProducts, promoLive])
 
   // syncMeta wywoływane raz na mount (nie na każdy re-render defs — nowa referencja
   // za każdym renderem parent'a powodowała setItems w loop-e nawet gdy dane były te same,

@@ -21,6 +21,26 @@ export function totalSavings(promos?: PromoProduct[] | null): number {
   }, 0)
 }
 
+// Cena przepisu w cenach zwykłych — pokazywana, gdy promocje już wygasły.
+// price_total jest policzone po cenach promocyjnych, więc doliczamy z powrotem
+// różnicę do ceny regularnej. Bierzemy WSZYSTKIE promocje (także wygasłe),
+// bo pytanie brzmi „ile to kosztuje bez promocji", a nie „ile oszczędzasz dziś".
+export function regularPrice(
+  priceTotal: number | null | undefined,
+  promos?: PromoProduct[] | null
+): number | null {
+  if (!priceTotal) return null
+  const uplift = (promos ?? [])
+    .filter((p) => (p.price_promo ?? 0) >= MIN_PLAUSIBLE_PRICE)
+    .reduce((sum, p) => {
+      if (p.price_regular != null && p.price_regular > p.price_promo) {
+        return sum + (p.price_regular - p.price_promo)
+      }
+      return sum
+    }, 0)
+  return Math.round((priceTotal + uplift) * 100) / 100
+}
+
 // Data najwcześniej wygasającej aktywnej promocji — wyznacza, jak długo przepis
 // jest jeszcze aktualny (wygaśnięcie choćby jednej promocji ukrywa cały przepis).
 export function soonestPromoEnd(promos?: PromoProduct[] | null): string | null {

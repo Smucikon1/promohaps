@@ -4,8 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Clock, Flame, ShoppingBag, PiggyBank, Users, Wallet } from 'lucide-react'
-import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, isPromoExpired, promoDaysLeft, hasActivePromo, pricePerServing } from '@/lib/utils'
-import { totalSavings, savingsPercent } from '@/lib/savings'
+import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActive, promoDaysLeft, hasActivePromo, pricePerServing } from '@/lib/utils'
+import { totalSavings, savingsPercent, regularPrice } from '@/lib/savings'
 import { storeColor } from '@/lib/stores'
 import { ShoppingList } from '@/components/recipe/ShoppingList'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
@@ -53,8 +53,11 @@ export default async function RecipePage({ params }: Props) {
 
   if (!recipe) notFound()
 
-  // Wygasła choć jedna promocja => przepis znika ze strony (nieaktualne ceny)
-  if ((recipe.promo_products ?? []).some((p: any) => isPromoExpired(p.valid_to))) notFound()
+  // Po wygaśnięciu promocji strona ZOSTAJE (sam przepis się nie starzeje, starzeje się
+  // tylko cena). Znika z listingów i sitemapy, a zamiast ceny promocyjnej pokazuje
+  // koszt w cenach zwykłych. Gdyby zwracała 404, Google co tydzień dostawałby serię
+  // martwych adresów i przestałby ufać domenie.
+  const promoLive = hasActivePromo(recipe.promo_products)
 
   const normalized = {
     ...recipe,
@@ -78,7 +81,11 @@ export default async function RecipePage({ params }: Props) {
   const needsCard = activePromos.some((p: any) => p.condition_type === 'karta')
   const savings = totalSavings(normalized.promo_products)
   const percent = savingsPercent(normalized.price_total, normalized.promo_products)
-  const perServing = pricePerServing(normalized.price_total, normalized.servings)
+
+  // Po wygaśnięciu promocji cena promocyjna jest już nieosiągalna — pokazujemy
+  // koszt w cenach zwykłych, żeby nikt nie poszedł do sklepu z nieaktualną kwotą.
+  const shownPrice = promoLive ? normalized.price_total : regularPrice(normalized.price_total, normalized.promo_products)
+  const perServing = pricePerServing(shownPrice, normalized.servings)
 
   // Powiązane przepisy z tego samego sklepu
   const { data: relatedRaw } = await supabase
@@ -208,6 +215,20 @@ export default async function RecipePage({ params }: Props) {
           <p className="text-stone-600 text-lg leading-relaxed mb-5">{normalized.description}</p>
         )}
 
+        {/* Promocja wygasła — przepis zostaje, ale cena promocyjna jest już nieaktualna */}
+        {!promoLive && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5">
+            <span className="text-lg leading-none mt-0.5">🗓️</span>
+            <div className="text-sm text-stone-600 leading-relaxed">
+              <strong className="text-stone-800">Promocja z gazetki już się skończyła.</strong>{' '}
+              Przepis zostaje — poniżej koszt w zwykłych cenach sklepowych.{' '}
+              <Link href="/" className="font-semibold text-[#12b76a] hover:underline">
+                Zobacz przepisy z aktualnych gazetek
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Akcje przepisu (Wróć jest teraz pływający pod logotypem w layout) */}
         <div className="no-print flex flex-wrap items-center gap-3 mb-6">
           <RecipeActions
@@ -256,11 +277,13 @@ export default async function RecipePage({ params }: Props) {
               <div className="text-xs text-stone-500">{normalized.servings === 1 ? 'porcja' : normalized.servings < 5 ? 'porcje' : 'porcji'}</div>
             </div>
           )}
-          {normalized.price_total && (
+          {shownPrice && (
             <div className="flex-1 min-w-[80px] px-4 text-center">
               <ShoppingBag className="w-5 h-5 text-amber-500 mx-auto mb-1" />
-              <div className="font-semibold text-stone-800">{formatPrice(normalized.price_total)}</div>
-              <div className="text-xs text-stone-500">Koszt <span className="text-stone-400">(orientacyjny)</span></div>
+              <div className="font-semibold text-stone-800">{formatPrice(shownPrice)}</div>
+              <div className="text-xs text-stone-500">
+                Koszt <span className="text-stone-400">({promoLive ? 'orientacyjny' : 'bez promocji'})</span>
+              </div>
             </div>
           )}
           {perServing && (
@@ -307,6 +330,7 @@ export default async function RecipePage({ params }: Props) {
             <ShoppingList
               recipeId={normalized.id}
               ingredients={normalized.ingredients}
+              promoLive={promoLive}
             />
           </div>
 

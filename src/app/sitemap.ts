@@ -1,24 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { SITE_URL } from '@/lib/site'
 import { COLLECTIONS } from '@/lib/collections'
-import { hasActivePromo } from '@/lib/utils'
 
 export default async function Sitemap() {
   const supabase = await createClient()
 
-  const [{ data: allRecipes }, { data: stores }, { data: categories }] = await Promise.all([
-    // Do sitemapy trafiają tylko przepisy widoczne dla użytkownika:
-    // opublikowane, z ceną i z co najmniej jedną trwającą promocją.
+  const [{ data: recipes }, { data: stores }, { data: categories }] = await Promise.all([
+    // Wszystkie opublikowane przepisy z ceną — także te po wygaśnięciu promocji.
+    // Strona przepisu nadal działa (pokazuje cenę bez promocji), więc usuwanie jej
+    // z sitemapy tylko kazałoby Google porzucić zaindeksowany, żywy adres.
     supabase
       .from('recipes')
-      .select('id, slug, updated_at, promo_products(valid_to)')
+      .select('id, slug, updated_at')
       .eq('is_published', true)
       .gt('price_total', 0),
     supabase.from('stores').select('slug').eq('is_active', true),
     supabase.from('categories').select('slug').eq('is_active', true),
   ])
-
-  const recipes = (allRecipes ?? []).filter((r: any) => hasActivePromo(r.promo_products))
 
   const base = SITE_URL
 
