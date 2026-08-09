@@ -1,6 +1,11 @@
 // Serwerowy moduł AI (Claude Opus 4.8). NIE importować w kodzie klienta.
 import Anthropic from '@anthropic-ai/sdk'
 
+// Obietnica serwisu: tanio i prosto. Przepis łamiący którykolwiek limit jest
+// odrzucany zamiast publikowany — admin generuje ponownie (koszt jednego wywołania).
+export const MAX_RECIPE_PRICE = 30
+export const MAX_INGREDIENTS = 10
+
 function client() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('Brak ANTHROPIC_API_KEY w konfiguracji serwera.')
@@ -132,10 +137,16 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     'ANTY-UBOGI PRZEPIS: mimo taniości danie ma być pełnowartościowe — musi mieć źródło białka (mięso/ryba/strączki/nabiał/jajka),',
     '  bazę węglowodanową (ziemniaki/ryż/makaron/kasza/pieczywo) i warzywa/owoce. Nie tylko sama sałatka z pomidora.',
     '',
-    'BUDŻET DOCELOWY (bardzo ważne): CELUJ w price_total ≤ 30 zł dla całego przepisu (typowo 4 porcje).',
-    '  Jeśli przekracza 30 zł — zmniejsz ilości, wybierz tańsze warianty składników z gazetki, zredukuj listę.',
-    '  Twardy limit: NIGDY nie przekraczaj 45 zł. Wyjątki (drogie ryby, sery, mięsa) muszą być uzasadnione tematem.',
-    'TREŚCIWOŚĆ: mimo budżetu przepis MA SYCIĆ — porcja realnie zapełnia talerz, nie jest to przekąska.',
+    'BUDŻET — TWARDY LIMIT 30 zł (najważniejsza reguła serwisu):',
+    '  suma price wszystkich składników MUSI wyjść ≤ 30 zł. Bez wyjątków.',
+    '  Zanim zwrócisz JSON: ZSUMUJ price wszystkich ingredients. Jeśli > 30 zł — przerób przepis, nie zaniżaj cen.',
+    '  Jak się zmieścić uczciwie: tańsze białko (mielone/udka/jaja/strączki zamiast piersi, schabu, łososia),',
+    '  mniej pozycji spoza gazetki, oprzyj danie na 2–3 produktach promocyjnych zamiast pięciu.',
+    'PROSTOTA (równie ważna jak cena): 5–8 składników łącznie, maksymalnie 10.',
+    '  Zwykłe produkty z każdego sklepu — żadnych niszowych, drogich czy „wymyślnych" dodatków',
+    '  (bez pinii, świeżej bazylii poza sezonem, parmezanu, wina do gotowania, egzotycznych przypraw).',
+    '  Przyprawy: sól, pieprz, papryka, czosnek, zioła prowansalskie — to ma być kuchnia domowa, nie restauracyjna.',
+    'TREŚCIWOŚĆ: mimo budżetu i prostoty danie MA SYCIĆ — porcja realnie zapełnia talerz, nie jest to przekąska.',
     '  Zapewnij min. 400–600 kcal na porcję (nie licz — dobierz składniki: pełne białko + porządny węglowodan',
     '  + warzywo, w rozsądnych ilościach na 4 osoby). Uwaga na sałatki-nic — jeśli sałatka, dodaj ser/mięso/jajko/kaszę.',
     'CENY: składniki spoza gazetki wyceniaj REALISTYCZNIE (cena typowego opakowania, nie zaniżaj).',
@@ -173,28 +184,56 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     instrukcja: 'Wygeneruj jeden kompletny przepis zgodny ze schematem, wykorzystując produkty z gazetki jako składniki, jeśli podano.',
   }
 
-  // thinking wyłączone — content generation nie potrzebuje reasoning, a Vercel Hobby ma limit 60s
-  const response = await client().messages.create({
-    model: 'claude-sonnet-5',
-    max_tokens: 8000,
-    thinking: { type: 'disabled' },
-    output_config: { format: { type: 'json_schema', schema }, effort: 'low' },
-    system,
-    messages: [{ role: 'user', content: JSON.stringify(payload) }],
-  } as any)
+  // Model bywa rozrzutny mimo instrukcji. Zamiast odrzucać całą generację, dajemy
+  // mu drugą szansę z konkretną informacją zwrotną — mieści się w limicie czasu Vercela.
+  const messages: any[] = [{ role: 'user', content: JSON.stringify(payload) }]
 
-  if (response.stop_reason === 'refusal') throw new Error('Model odmówił wygenerowania treści.')
-  const recipe = JSON.parse(firstText(response))
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // thinking wyłączone — content generation nie potrzebuje reasoning, a Vercel Hobby ma limit 60s
+    const response = await client().messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 8000,
+      thinking: { type: 'disabled' },
+      output_config: { format: { type: 'json_schema', schema }, effort: 'low' },
+      system,
+      messages,
+    } as any)
 
-  // Cena całości liczona deterministycznie z cen składników — model bywa niespójny,
-  // a kafelek („Cena całości") i strona przepisu („Razem") muszą pokazywać to samo.
-  const sum = (recipe.ingredients ?? []).reduce(
-    (acc: number, i: any) => acc + (typeof i?.price === 'number' ? i.price : 0),
-    0
-  )
-  if (sum > 0) recipe.price_total = Math.round(sum * 100) / 100
+    if (response.stop_reason === 'refusal') throw new Error('Model odmówił wygenerowania treści.')
+    const raw = firstText(response)
+    const recipe = JSON.parse(raw)
 
-  return recipe
+    // Cena całości liczona deterministycznie z cen składników — model bywa niespójny,
+    // a kafelek („Cena całości") i strona przepisu („Razem") muszą pokazywać to samo.
+    const sum = (recipe.ingredients ?? []).reduce(
+      (acc: number, i: any) => acc + (typeof i?.price === 'number' ? i.price : 0),
+      0
+    )
+    if (sum > 0) recipe.price_total = Math.round(sum * 100) / 100
+
+    const overBudget = recipe.price_total > MAX_RECIPE_PRICE
+    const tooManyIngredients = (recipe.ingredients ?? []).length > MAX_INGREDIENTS
+    if (!overBudget && !tooManyIngredients) return recipe
+
+    const problems = [
+      overBudget ? `suma wyszła ${recipe.price_total.toFixed(2)} zł (limit ${MAX_RECIPE_PRICE} zł)` : '',
+      tooManyIngredients ? `użyto ${recipe.ingredients.length} składników (limit ${MAX_INGREDIENTS})` : '',
+    ].filter(Boolean).join(' oraz ')
+
+    if (attempt === 1) throw new Error(`Nie udało się zmieścić w limitach: ${problems}. Spróbuj ponownie.`)
+
+    // Druga próba: model widzi własny wynik i wie dokładnie, co poprawić
+    messages.push({ role: 'assistant', content: raw })
+    messages.push({
+      role: 'user',
+      content:
+        `Ten przepis łamie limity serwisu: ${problems}. ` +
+        'Przerób go: tańsze białko, mniej pozycji spoza gazetki, mniejsze opakowania. ' +
+        'NIE zaniżaj cen — zmień składniki. Zwróć poprawiony przepis w tym samym formacie.',
+    })
+  }
+
+  throw new Error('Nie udało się wygenerować przepisu.')
 }
 
 // ---------- Odczyt gazetki (wizja) ----------

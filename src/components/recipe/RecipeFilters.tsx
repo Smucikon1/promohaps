@@ -33,11 +33,13 @@ const DIFFICULTIES = [
 // Progi cenowe z kontekstem — użytkownik od razu widzi „do czego to jest":
 // szybki posiłek, codzienny obiad, dla rodziny. Chip label pokazuje tylko cenę,
 // żeby był krótki; pełny opis widać w dropdownie.
+// Progi trzymają się limitu 30 zł na przepis (MAX_RECIPE_PRICE) — wyższe widełki
+// nie filtrowałyby niczego, bo droższe przepisy w ogóle nie powstają.
 const PRICE_RANGES = [
-  { value: '15', short: 'Do 15 zł', hint: 'Ekstra tanio' },
-  { value: '25', short: 'Do 25 zł', hint: 'Codzienny obiad' },
-  { value: '40', short: 'Do 40 zł', hint: 'Dla rodziny' },
-  { value: '60', short: 'Do 60 zł', hint: 'Specjalna okazja' },
+  { value: '10', short: 'Do 10 zł', hint: 'Ekstra tanio' },
+  { value: '15', short: 'Do 15 zł', hint: 'Szybki posiłek' },
+  { value: '20', short: 'Do 20 zł', hint: 'Codzienny obiad' },
+  { value: '30', short: 'Do 30 zł', hint: 'Dla rodziny' },
 ]
 
 /**
