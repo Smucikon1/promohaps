@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Polityka prywatności',
-  description: 'Zasady przetwarzania danych i wykorzystania cookies w serwisie Promohaps.',
+  description: 'Zasady przetwarzania danych i wykorzystania cookies w serwisie zGazetki.',
   robots: { index: true, follow: true },
 }
 

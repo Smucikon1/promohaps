@@ -5,7 +5,7 @@ import { hasActivePromo } from '@/lib/utils'
 
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
-export const alt = 'Promohaps'
+export const alt = 'zGazetki'
 
 // Dynamiczny OG per przepis — tytuł, cena, % oszczędności. Fallback do domyślnego, gdy braknie danych.
 // Satori (silnik pod ImageResponse) wymaga explicit display: flex na każdym elemencie z >1 dzieckiem.
@@ -19,7 +19,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     .eq('is_published', true)
     .single()
 
-  const title = recipe?.title ?? 'Promohaps — przepisy z gazetek promocyjnych'
+  const title = recipe?.title ?? 'zGazetki — przepisy z gazetek promocyjnych'
   const storeName = (recipe?.store as any)?.name as string | undefined
   const promos = (recipe?.promo_products as any) ?? []
   // Po wygaśnięciu promocji nie wolno rozsyłać w social mediach nieaktualnej ceny
@@ -59,7 +59,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             background: '#faf9f6',
           }}
         >
-          <div style={{ display: 'flex', fontSize: 32, fontWeight: 800, color: '#12b76a' }}>Promohaps</div>
+          <div style={{ display: 'flex', fontSize: 32, fontWeight: 800, color: '#12b76a' }}>zGazetki</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {storeName && (
               <div style={{ display: 'flex', alignSelf: 'flex-start', padding: '8px 18px', background: '#12b76a', color: 'white', borderRadius: 999, fontSize: 20, fontWeight: 700 }}>

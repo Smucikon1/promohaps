@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Regulamin',
-  description: 'Regulamin korzystania z serwisu Promohaps.',
+  description: 'Regulamin korzystania z serwisu zGazetki.',
   robots: { index: true, follow: true },
 }
 
@@ -20,7 +20,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-lg font-bold text-stone-900 mb-2">1. Postanowienia ogólne</h2>
-          <p>Serwis „Promohaps" (promohaps.pl) udostępnia przepisy kulinarne powiązane z aktualnymi promocjami w sieciach handlowych. Usługodawcą jest <strong>Tomasz Pawłowicz, NIP 5632331998</strong>.</p>
+          <p>Serwis „zGazetki" (zgazetki.pl) udostępnia przepisy kulinarne powiązane z aktualnymi promocjami w sieciach handlowych. Usługodawcą jest <strong>Tomasz Pawłowicz, NIP 5632331998</strong>.</p>
         </section>
 
         <section>

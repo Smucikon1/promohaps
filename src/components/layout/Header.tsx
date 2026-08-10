@@ -44,10 +44,17 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-stone-100">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Nowe logo Promohaps */}
-        <Link href="/" aria-label="Promohaps — strona główna" className="flex items-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Promohaps" className="h-[1.8rem] w-auto" />
+        {/* Logotyp jako tekst, nie obrazek: SVG wczytany przez <img> nie ma dostępu
+            do webfontów strony, więc krój podmieniłby się na systemowy. Tak dostajemy
+            wczytany Outfit i ostrość na każdym ekranie. */}
+        <Link
+          href="/"
+          aria-label="zGazetki — strona główna"
+          className="flex items-center text-[1.6rem] font-bold leading-none tracking-tight"
+          style={{ fontFamily: 'var(--font-serif)' }}
+        >
+          <span className="text-[#12b76a]">z</span>
+          <span className="text-[#161918]">Gazetki</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-stone-600">

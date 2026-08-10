@@ -28,9 +28,14 @@ export function AdminNav() {
   return (
     <aside className="w-56 bg-white border-r border-stone-100 flex flex-col min-h-screen">
       <div className="p-5 border-b border-stone-50">
-        <Link href="/" className="flex items-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Promohaps" className="h-6 w-auto" />
+        <Link
+          href="/"
+          aria-label="zGazetki — strona główna"
+          className="flex items-center text-xl font-bold leading-none tracking-tight"
+          style={{ fontFamily: 'var(--font-serif)' }}
+        >
+          <span className="text-[#12b76a]">z</span>
+          <span className="text-[#161918]">Gazetki</span>
         </Link>
         <p className="text-xs text-stone-400 mt-1">Panel admina</p>
       </div>

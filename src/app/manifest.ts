@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Promohaps — przepisy z promocji',
-    short_name: 'Promohaps',
-    description: 'Promohaps — przepisy dopasowane do aktualnych promocji w Biedronce, Lidlu, Auchan, Carrefour i Kauflandzie.',
+    name: 'zGazetki — przepisy z promocji',
+    short_name: 'zGazetki',
+    description: 'zGazetki — przepisy dopasowane do aktualnych promocji w Biedronce, Lidlu, Auchan, Carrefour i Kauflandzie.',
     start_url: '/',
     scope: '/',
     display: 'standalone',

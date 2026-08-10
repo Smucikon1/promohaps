@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         email,
         send_welcome_email: true,
-        utm_source: 'promohaps.pl',
+        utm_source: 'zgazetki.pl',
       }),
     })
     if (!res.ok) {

@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og'
 
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
-export const alt = 'Promohaps — przepisy z gazetek promocyjnych'
+export const alt = 'zGazetki — przepisy z gazetek promocyjnych'
 
 // Satori wymaga explicit `display: flex` na każdym elemencie z >1 dzieckiem.
 export default function Image() {
@@ -20,7 +20,7 @@ export default function Image() {
           fontFamily: 'sans-serif',
         }}
       >
-        <div style={{ display: 'flex', fontSize: 44, fontWeight: 800, color: '#12b76a' }}>Promohaps</div>
+        <div style={{ display: 'flex', fontSize: 44, fontWeight: 800, color: '#12b76a' }}>zGazetki</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div
             style={{

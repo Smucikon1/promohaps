@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { X, Mail, Check } from 'lucide-react'
 
-const DISMISS_KEY = 'promohaps:newsletter-dismissed'
-const SUBBED_KEY = 'promohaps:newsletter-subbed'
+const DISMISS_KEY = 'zgazetki:newsletter-dismissed'
+const SUBBED_KEY = 'zgazetki:newsletter-subbed'
 
 // Popup zapisu na newsletter. Pokazuje się po 30s pobytu na stronie
 // LUB po scrollu > 50%, o ile nie został wcześniej odrzucony/zapisany.

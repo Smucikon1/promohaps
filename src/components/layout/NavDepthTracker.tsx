@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
-export const NAV_DEPTH_KEY = 'promohaps:navDepth'
+export const NAV_DEPTH_KEY = 'zgazetki:navDepth'
 
 // Liczy nawigacje wewnątrz aplikacji w obrębie karty. Dzięki temu przycisk „Wróć"
 // wie, czy jest dokąd cofnąć (poprzednia strona serwisu), czy trzeba użyć zapasowego

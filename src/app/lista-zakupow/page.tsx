@@ -247,7 +247,7 @@ function ShoppingListInner() {
 
   const share = async () => {
     if (!shareUrl) return
-    const title = 'Moja lista zakupów — Promohaps'
+    const title = 'Moja lista zakupów — zGazetki'
     const text = 'Wysyłam Ci listę zakupów. Kliknij, żeby dodać ją do swojej.'
     if (typeof navigator !== 'undefined' && (navigator as any).share) {
       try {

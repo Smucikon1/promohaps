@@ -31,25 +31,25 @@ const outfitDisplay = Outfit({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Promohaps — przepisy z promocji: Biedronka, Lidl, Auchan, Carrefour, Kaufland',
-    template: '%s | Promohaps',
+    default: 'zGazetki — przepisy z promocji: Biedronka, Lidl, Auchan, Carrefour, Kaufland',
+    template: '%s | zGazetki',
   },
-  description: 'Promohaps — przepisy kulinarne oparte na aktualnych promocjach w Biedronce, Lidlu, Auchan, Carrefour i Kauflandzie. Gotuj taniej dzięki gazetkom promocyjnym.',
-  keywords: ['promohaps', 'przepisy z gazetki', 'gazetka promocyjna', 'biedronka', 'lidl', 'auchan', 'carrefour', 'kaufland', 'dino', 'netto', 'tanie gotowanie', 'oszczędne przepisy'],
+  description: 'zGazetki — przepisy kulinarne oparte na aktualnych promocjach w Biedronce, Lidlu, Auchan, Carrefour i Kauflandzie. Gotuj taniej dzięki gazetkom promocyjnym.',
+  keywords: ['zgazetki', 'przepisy z gazetki', 'gazetka promocyjna', 'biedronka', 'lidl', 'auchan', 'carrefour', 'kaufland', 'dino', 'netto', 'tanie gotowanie', 'oszczędne przepisy'],
   openGraph: {
     type: 'website',
     locale: 'pl_PL',
-    siteName: 'Promohaps',
+    siteName: 'zGazetki',
     // Obraz OG generowany dynamicznie przez src/app/opengraph-image.tsx (Next konwencja).
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Promohaps — przepisy z gazetek promocyjnych',
+    title: 'zGazetki — przepisy z gazetek promocyjnych',
     description: 'Gotuj taniej dzięki aktualnym promocjom Biedronki, Lidla, Kauflanda, Auchan i Carrefour.',
   },
   robots: { index: true, follow: true },
-  applicationName: 'Promohaps',
-  appleWebApp: { capable: true, title: 'Promohaps', statusBarStyle: 'default' },
+  applicationName: 'zGazetki',
+  appleWebApp: { capable: true, title: 'zGazetki', statusBarStyle: 'default' },
   icons: {
     icon: '/icon.svg',
     apple: '/icon.svg',
@@ -76,7 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <MetaPixel />
         <footer className="hidden md:block bg-white border-t border-stone-100 py-8 mt-16">
           <div className="max-w-6xl mx-auto px-4 text-center text-stone-500 text-sm">
-            <p>© {new Date().getFullYear()} Promohaps</p>
+            <p>© {new Date().getFullYear()} zGazetki</p>
             <p className="mt-1">Przepisy tworzone na podstawie aktualnych gazetek promocyjnych</p>
             <p className="mt-3 flex items-center justify-center gap-4">
               <Link href="/polityka-prywatnosci" className="hover:text-stone-600 transition-colors">Polityka prywatności</Link>
@@ -85,7 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </p>
             <p className="mt-4 text-xs text-stone-400 max-w-2xl mx-auto">
               Nazwy i logotypy sieci handlowych są znakami towarowymi ich właścicieli i służą wyłącznie
-              celom informacyjnym. Promohaps nie jest powiązany ani sponsorowany przez te sieci.
+              celom informacyjnym. zGazetki nie jest powiązany ani sponsorowany przez te sieci.
             </p>
           </div>
         </footer>

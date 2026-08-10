@@ -7,7 +7,7 @@ import { activePromos, totalSavings } from '@/lib/savings'
 import type { Recipe } from '@/types'
 
 // Jeden przepis „na afiszu” — najtańszy z aktualnych. Cena jest tu bohaterem,
-// bo to ona jest powodem, dla którego ktoś wchodzi na Promohaps.
+// bo to ona jest powodem, dla którego ktoś wchodzi na zGazetki.
 export function FeaturedRecipe({ recipe }: { recipe: Recipe }) {
   const promos = activePromos(recipe.promo_products)
   const savings = totalSavings(recipe.promo_products)

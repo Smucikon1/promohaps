@@ -300,7 +300,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
   return (
     <div>
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Hero: badge + nagłówek. Logo Promohaps jest już w topbarze (Header). */}
+        {/* Hero: badge + nagłówek. Logo zGazetki jest już w topbarze (Header). */}
         <header className="relative mb-6 px-1 py-5 md:py-8">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e6f9f0] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#12b76a]">
             <PiggyBank className="w-3.5 h-3.5" />
