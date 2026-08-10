@@ -25,6 +25,22 @@ export function productKey(name: string): string {
     .join('|')
 }
 
+// Podstawy spiżarni — masz je w domu albo kupujesz raz na miesiąc. Pokazywanie
+// „kupujesz sól raz zamiast pięć razy" ośmiesza całą listę wspólnych produktów,
+// bo nikt nie planuje zakupu soli pod konkretny obiad.
+const PANTRY = [
+  'sol', 'pieprz', 'cukier', 'maka', 'olej', 'oliwa', 'ocet', 'woda',
+  'przyprawa', 'ziola', 'papryka slodka', 'majeranek', 'oregano', 'bazylia',
+  'kminek', 'liscie', 'lisc', 'czosnek granulowany', 'soda', 'proszek',
+]
+
+function isPantry(name: string): boolean {
+  const n = String(name ?? '')
+    .toLowerCase()
+    .replace(/[ąćęłńóśźż]/g, (c) => PL_MAP[c] ?? c)
+  return PANTRY.some((p) => n.includes(p))
+}
+
 export interface SetRecipe {
   id: string
   title: string
@@ -119,7 +135,7 @@ export function buildWeeklySet(candidates: SetRecipe[], size = 5): WeeklySet | n
     }
   }
   const sharedProducts = [...seen.values()]
-    .filter((x) => x.count > 1)
+    .filter((x) => x.count > 1 && !isPantry(x.name))
     .map((x) => x.name)
 
   const costSeparately = chosen.reduce((s, r) => s + (r.price_total ?? 0), 0)

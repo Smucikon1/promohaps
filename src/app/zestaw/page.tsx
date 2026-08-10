@@ -86,7 +86,6 @@ export default async function WeeklySetPage() {
   }
 
   const store = (set.recipes[0] as any)?.store
-  const totalSaved = set.sharedSavings + set.promoSavings
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -105,6 +104,12 @@ export default async function WeeklySetPage() {
           Jedna lista zakupów, {set.portions} porcji. Przepisy dobrane tak, żeby dzielić opakowania —
           produkt użyty w dwóch daniach kupujesz raz.
         </p>
+        {/* Bez tego zdania suma cen z kafelków niżej nie zgadza się z kwotą w nagłówku
+            i wygląda jak błąd rachunkowy. */}
+        <p className="mt-2 text-sm text-stone-500 max-w-2xl leading-relaxed">
+          Ceny przy poszczególnych przepisach dotyczą ugotowania każdego z osobna. W zestawie
+          są niższe, bo wspólne produkty kupujesz tylko raz.
+        </p>
       </header>
 
       {/* Rozbicie kwoty — pokazujemy skąd bierze się oszczędność */}
@@ -121,14 +126,17 @@ export default async function WeeklySetPage() {
             {set.recipes.length}
           </div>
         </div>
-        {set.sharedSavings >= 0.5 && (
+        {/* Liczba, nie kwota. Wyliczanie „oszczędności" ze współdzielenia zakładałoby,
+            że bez zestawu kupiłbyś osobną paczkę jajek i masła do każdego obiadu —
+            czego nikt nie robi. Sama liczba wspólnych produktów jest sprawdzalna. */}
+        {set.sharedProducts.length > 0 && (
           <div className="bg-green-50 rounded-2xl border border-green-200 p-4">
             <div className="text-xs text-green-700 mb-1 flex items-center gap-1">
               <Recycle className="w-3.5 h-3.5" />
               Wspólne produkty
             </div>
             <div className="text-2xl font-bold text-green-800" style={{ fontFamily: 'var(--font-serif)' }}>
-              −{formatPrice(set.sharedSavings)}
+              {set.sharedProducts.length}
             </div>
           </div>
         )}
@@ -160,12 +168,15 @@ export default async function WeeklySetPage() {
         <AddSetToList recipes={set.recipes as any} />
       </div>
 
-      {totalSaved >= 1 && (
+      {/* Tylko oszczędność z gazetki — ta jest sprawdzalna, bo porównuje cenę promocyjną
+          z regularną tych samych produktów, które faktycznie wkładasz do koszyka. */}
+      {set.promoSavings >= 1 && (
         <div className="mb-8 flex items-center gap-3 rounded-2xl bg-green-100 border border-green-200 px-4 py-3">
           <PiggyBank className="w-6 h-6 text-green-700 flex-shrink-0" />
           <p className="text-sm text-green-900">
-            Ten zestaw jest o <span className="font-extrabold">{formatPrice(totalSaved)}</span> tańszy
-            niż te same dania kupowane osobno i bez promocji.
+            Dzięki promocjom z gazetki te zakupy są o{' '}
+            <span className="font-extrabold">{formatPrice(set.promoSavings)}</span> tańsze
+            niż przy cenach regularnych.
           </p>
         </div>
       )}
