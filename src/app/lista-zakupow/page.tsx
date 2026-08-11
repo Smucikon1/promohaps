@@ -14,6 +14,8 @@ import {
   type ShoppingItem,
 } from '@/lib/shopping'
 import { decodeShareList, encodeShareList, mergeShareIntoStorage, type ShareGroup } from '@/lib/shoppingShare'
+// Ten sam klucz co przy doborze zestawu — „Twaróg 250g" i „twaróg" mają być jednym produktem
+import { productKey } from '@/lib/weeklySet'
 import { SuggestedRecipes } from '@/components/shopping/SuggestedRecipes'
 
 type FlatItem = ShoppingItem & { _key: string }
@@ -195,10 +197,30 @@ function ShoppingListInner() {
   const checkedCount = items.filter((i) => i.checked).length
   const progress = items.length > 0 ? (checkedCount / items.length) * 100 : 0
 
-  // Ile ta lista kosztuje i ile na niej zaoszczędzisz względem cen regularnych.
-  // Liczone z pozycji, które mają obie ceny — reszta nie wnosi oszczędności.
-  const listCost = items.reduce((s, i) => s + (i.price ?? 0), 0)
-  const listSaved = items.reduce(
+  // W sklepie kupujesz całe opakowanie, nawet gdy przepis potrzebuje połowy — dlatego
+  // ceny to zawsze pełne opakowania. Ale jeśli kilka przepisów na liście używa tego
+  // samego produktu, kupujesz go RAZ, więc do sumy wchodzi raz, a jego koszt rozkłada
+  // się po równo na te przepisy. Bez tego trzy dania z jajkami naliczały trzy jajka.
+  const recipesPerProduct = new Map<string, Set<string>>()
+  for (const it of items) {
+    const k = productKey(it.name)
+    if (!k) continue
+    if (!recipesPerProduct.has(k)) recipesPerProduct.set(k, new Set())
+    recipesPerProduct.get(k)!.add(it._key)
+  }
+  const shareOf = (it: FlatItem) => recipesPerProduct.get(productKey(it.name))?.size ?? 1
+  // Udział jednego przepisu w koszcie opakowania. Suma udziałów po wszystkich
+  // przepisach daje dokładnie cenę jednego opakowania, więc podsumy się zgadzają.
+  const shareCost = (it: FlatItem) => (it.price ?? 0) / shareOf(it)
+
+  // Do sumy całej listy każdy produkt wchodzi raz, po pełnej cenie opakowania
+  const uniqueProducts = new Map<string, FlatItem>()
+  for (const it of items) {
+    const k = productKey(it.name) || `${it._key}:${it.id}`
+    if (!uniqueProducts.has(k)) uniqueProducts.set(k, it)
+  }
+  const listCost = [...uniqueProducts.values()].reduce((s, i) => s + (i.price ?? 0), 0)
+  const listSaved = [...uniqueProducts.values()].reduce(
     (s, i) =>
       i.priceRegular != null && i.price != null && i.priceRegular > i.price
         ? s + (i.priceRegular - i.price)
@@ -219,7 +241,9 @@ function ShoppingListInner() {
       key,
       recipe: recipeMeta[suffix] ?? null,
       items: its,
-      subtotal: its.reduce((s, i) => s + (i.price ?? 0), 0),
+      // Podsuma przepisu = jego udziały w opakowaniach, nie pełne ceny —
+      // inaczej podsumy nie sumowałyby się do kwoty na dole listy.
+      subtotal: its.reduce((s, i) => s + shareCost(i), 0),
       bought: its.filter((i) => i.checked).length,
     }
   })
@@ -560,13 +584,14 @@ function ShoppingListInner() {
                             {item.isPromo && (
                               <span className="text-[10px] uppercase tracking-wide text-amber-600 font-semibold">z gazetki</span>
                             )}
-                            {(item.sharedCount ?? 0) > 1 && (
+                            {shareOf(item) > 1 && (
                               <span
-                                title="Jedno opakowanie wykorzystasz w kilku przepisach"
+                                title="Jedno opakowanie wykorzystasz w kilku przepisach — kupujesz je raz"
                                 className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-1.5 py-0.5"
                               >
                                 <Recycle className="w-3 h-3" />
-                                starcza na {item.sharedCount} przepisy
+                                jedno opakowanie na {shareOf(item)}{' '}
+                                {shareOf(item) < 5 ? 'przepisy' : 'przepisów'}
                               </span>
                             )}
                           </span>
@@ -574,9 +599,20 @@ function ShoppingListInner() {
 
                         {item.price != null ? (
                           <span className="text-right flex-shrink-0">
-                            <span className="block text-sm font-bold text-amber-600">{formatPrice(item.price)}</span>
-                            {item.priceRegular != null && (
-                              <span className="block text-[11px] text-stone-400 line-through">{formatPrice(item.priceRegular)}</span>
+                            {/* Przy produkcie dzielonym pokazujemy udział tego przepisu,
+                                a pod spodem cenę całego opakowania — żeby było widać,
+                                skąd bierze się kwota i ile realnie zapłacisz w kasie. */}
+                            <span className="block text-sm font-bold text-amber-600">
+                              {formatPrice(shareCost(item))}
+                            </span>
+                            {shareOf(item) > 1 ? (
+                              <span className="block text-[11px] text-stone-400">
+                                opak. {formatPrice(item.price)}
+                              </span>
+                            ) : (
+                              item.priceRegular != null && (
+                                <span className="block text-[11px] text-stone-400 line-through">{formatPrice(item.priceRegular)}</span>
+                              )
                             )}
                           </span>
                         ) : (
