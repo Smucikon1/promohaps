@@ -22,7 +22,60 @@ export const revalidate = 3600
 
 const SET_SIZE = 5
 
-export default async function WeeklySetPage() {
+// Kreator w adresie, nie w stanie klienta: gotowy zestaw da się wysłać znajomemu
+// albo wrócić do niego z zakładek, a strona zostaje renderowana po stronie serwera.
+type SetParams = { sklep?: string; dieta?: string }
+
+const DAYS = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek']
+
+function WizardShell({
+  step,
+  title,
+  lead,
+  back,
+  children,
+}: {
+  step: 1 | 2 | 3
+  title: string
+  lead: string
+  back?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-10">
+      <div className="flex items-center gap-2 mb-6">
+        {[1, 2].map((n) => (
+          <span
+            key={n}
+            className={`h-1.5 flex-1 rounded-full ${n <= step ? 'bg-[#12b76a]' : 'bg-stone-200'}`}
+            aria-hidden="true"
+          />
+        ))}
+        <span className="text-xs font-medium text-stone-400 ml-1">Krok {Math.min(step, 2)} z 2</span>
+      </div>
+
+      <h1 className="text-2xl md:text-3xl font-bold text-stone-900 mb-2" style={{ fontFamily: 'var(--font-serif)' }}>
+        {title}
+      </h1>
+      <p className="text-stone-600 mb-7 leading-relaxed">{lead}</p>
+
+      {children}
+
+      {back && (
+        <Link href={back} className="inline-block mt-6 text-sm text-stone-500 hover:text-stone-700 transition-colors">
+          ← Zmień poprzedni wybór
+        </Link>
+      )}
+    </div>
+  )
+}
+
+export default async function WeeklySetPage({
+  searchParams,
+}: {
+  searchParams: Promise<SetParams>
+}) {
+  const { sklep, dieta } = await searchParams
   const supabase = await createClient()
   const hidden = await expiredRecipeIds()
 
@@ -51,23 +104,28 @@ export default async function WeeklySetPage() {
       }))
   )
 
+  const isWege = (r: any) => (r.categories ?? []).some((c: any) => c?.slug === 'wege')
+
   // Zakupy robi się w jednym sklepie, więc zestaw też budujemy w obrębie sklepu.
-  const byStore = new Map<string, SetRecipe[]>()
+  const byStore = new Map<string, { store: any; all: SetRecipe[]; wege: SetRecipe[] }>()
   for (const r of usable as any[]) {
-    const key = r.store_id ?? ''
-    if (!byStore.has(key)) byStore.set(key, [])
-    byStore.get(key)!.push(r)
+    const slug = r.store?.slug
+    if (!slug) continue
+    if (!byStore.has(slug)) byStore.set(slug, { store: r.store, all: [], wege: [] })
+    const bucket = byStore.get(slug)!
+    bucket.all.push(r)
+    if (isWege(r)) bucket.wege.push(r)
   }
 
-  // Z każdego sklepu bierzemy najlepszy zestaw, pokazujemy ten o najniższym koszcie zakupów
-  const sets = [...byStore.values()]
-    .map((list) => buildWeeklySet(list, SET_SIZE))
-    .filter((s): s is NonNullable<typeof s> => s != null && s.recipes.length >= 3)
-    .sort((a, b) => a.cost - b.cost)
+  // Sklep pokazujemy tylko wtedy, gdy da się z niego złożyć sensowny tydzień —
+  // inaczej użytkownik wybiera kafelek i dostaje pustkę.
+  const MIN_FOR_SET = 3
+  const stores = [...byStore.values()]
+    .filter((s) => s.all.length >= MIN_FOR_SET)
+    .sort((a, b) => b.all.length - a.all.length)
 
-  const set = sets[0]
-
-  if (!set) {
+  // ── Krok 0: nie ma z czego układać ─────────────────────────────────────────
+  if (stores.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
         <div className="text-5xl mb-4">🛒</div>
@@ -75,13 +133,101 @@ export default async function WeeklySetPage() {
           Zestaw jest w przygotowaniu
         </h1>
         <p className="text-stone-500 mb-6">
-          Potrzebujemy kilku przepisów z trwających promocji, żeby ułożyć sensowny tydzień.
-          Zajrzyj po najbliższej aktualizacji gazetek.
+          Potrzebujemy kilku przepisów z trwających promocji w jednym sklepie, żeby ułożyć sensowny
+          tydzień. Zajrzyj po najbliższej aktualizacji gazetek.
         </p>
         <Link href="/" className="btn-primary inline-flex items-center gap-2">
           Przeglądaj przepisy
         </Link>
       </div>
+    )
+  }
+
+  const picked = sklep ? byStore.get(sklep) : undefined
+
+  // ── Krok 1: wybór sklepu ───────────────────────────────────────────────────
+  if (!picked || picked.all.length < MIN_FOR_SET) {
+    return (
+      <WizardShell step={1} title="W którym sklepie robisz zakupy?" lead="Cały tydzień składamy z jednej gazetki, żebyś nie jeździł po mieście.">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {stores.map(({ store, all }) => (
+            <Link
+              key={store.slug}
+              href={`/zestaw?sklep=${store.slug}`}
+              className="flex flex-col items-center gap-3 bg-white rounded-2xl border border-stone-200 p-5 hover:border-[#12b76a] hover:shadow-sm transition-all"
+            >
+              <StoreLogo slug={store.slug} name={store.name} className="h-9 w-auto max-w-[7rem] object-contain" />
+              <span className="text-xs text-stone-500">{all.length} przepisów w promocji</span>
+            </Link>
+          ))}
+        </div>
+      </WizardShell>
+    )
+  }
+
+  // ── Krok 2: dieta ──────────────────────────────────────────────────────────
+  const wegePossible = picked.wege.length >= MIN_FOR_SET
+  if (!dieta) {
+    return (
+      <WizardShell
+        step={2}
+        title="Jesz mięso?"
+        lead={`${picked.store.name} — wybierz, z czego mamy ułożyć pięć obiadów.`}
+        back="/zestaw"
+      >
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Link
+            href={`/zestaw?sklep=${sklep}&dieta=wszystko`}
+            className="bg-white rounded-2xl border border-stone-200 p-5 hover:border-[#12b76a] hover:shadow-sm transition-all"
+          >
+            <div className="text-2xl mb-2">🍗</div>
+            <div className="font-semibold text-stone-800">Bez ograniczeń</div>
+            <div className="text-sm text-stone-500 mt-0.5">{picked.all.length} przepisów do wyboru</div>
+          </Link>
+
+          {/* Kafelek nieaktywny, gdy wege przepisów jest za mało na tydzień —
+              lepiej powiedzieć to wprost niż pokazać pusty wynik po kliknięciu. */}
+          {wegePossible ? (
+            <Link
+              href={`/zestaw?sklep=${sklep}&dieta=wege`}
+              className="bg-white rounded-2xl border border-stone-200 p-5 hover:border-[#12b76a] hover:shadow-sm transition-all"
+            >
+              <div className="text-2xl mb-2">🥦</div>
+              <div className="font-semibold text-stone-800">Wegetariańskie</div>
+              <div className="text-sm text-stone-500 mt-0.5">{picked.wege.length} przepisów do wyboru</div>
+            </Link>
+          ) : (
+            <div className="bg-stone-50 rounded-2xl border border-stone-200 p-5 opacity-70">
+              <div className="text-2xl mb-2 grayscale">🥦</div>
+              <div className="font-semibold text-stone-500">Wegetariańskie</div>
+              <div className="text-sm text-stone-400 mt-0.5">
+                {picked.wege.length === 0
+                  ? 'Brak dań wege w tej gazetce'
+                  : `Tylko ${picked.wege.length} — za mało na tydzień`}
+              </div>
+            </div>
+          )}
+        </div>
+      </WizardShell>
+    )
+  }
+
+  // ── Krok 3: zestaw ─────────────────────────────────────────────────────────
+  const pool = dieta === 'wege' ? picked.wege : picked.all
+  const set = buildWeeklySet(pool, SET_SIZE)
+
+  if (!set || set.recipes.length < MIN_FOR_SET) {
+    return (
+      <WizardShell
+        step={3}
+        title="Nie ma z czego złożyć tygodnia"
+        lead={`W ${picked.store.name} jest za mało pasujących przepisów z trwających promocji.`}
+        back={`/zestaw?sklep=${sklep}`}
+      >
+        <Link href="/zestaw" className="btn-primary inline-flex items-center gap-2">
+          Wybierz inny sklep
+        </Link>
+      </WizardShell>
     )
   }
 
@@ -100,6 +246,14 @@ export default async function WeeklySetPage() {
         >
           {set.recipes.length} obiadów za {formatPrice(set.cost)}
         </h1>
+        <p className="mt-2 text-sm text-stone-500">
+          {picked.store.name}
+          {dieta === 'wege' && ' · wegetariańskie'}
+          {' · '}
+          <Link href={`/zestaw?sklep=${sklep}`} className="text-[#12b76a] font-medium hover:underline">
+            zmień
+          </Link>
+        </p>
         <p className="mt-3 text-stone-600 max-w-2xl leading-relaxed">
           Jedna lista zakupów, {set.portions} porcji. Przepisy dobrane tak, żeby dzielić opakowania —
           produkt użyty w dwóch daniach kupujesz raz.
@@ -201,11 +355,18 @@ export default async function WeeklySetPage() {
       )}
 
       <h2 className="text-xl font-bold text-stone-900 mb-5" style={{ fontFamily: 'var(--font-serif)' }}>
-        Co ugotujesz
+        Plan na tydzień
       </h2>
+      {/* Dni to tylko podpowiedź kolejności — nic nie stoi na przeszkodzie, żeby
+          ugotować je w innym porządku, więc nie obiecujemy nic ponad to. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {set.recipes.map((r: any, i: number) => (
-          <RecipeCard key={r.id} recipe={r} index={i} />
+          <div key={r.id}>
+            <div className="text-xs font-semibold uppercase tracking-wider text-stone-400 mb-2">
+              {DAYS[i] ?? `Dzień ${i + 1}`}
+            </div>
+            <RecipeCard recipe={r} index={i} />
+          </div>
         ))}
       </div>
 
