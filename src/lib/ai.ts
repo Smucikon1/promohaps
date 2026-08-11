@@ -1,5 +1,7 @@
 // Serwerowy moduł AI (Claude Opus 4.8). NIE importować w kodzie klienta.
 import Anthropic from '@anthropic-ai/sdk'
+// Ten sam próg wiarygodności ceny, co przy liczeniu oszczędności na stronie
+import { MIN_PLAUSIBLE_PRICE } from '@/lib/savings'
 
 // Obietnica serwisu: tanio i prosto. Przepis łamiący którykolwiek limit jest
 // odrzucany zamiast publikowany — admin generuje ponownie (koszt jednego wywołania).
@@ -375,7 +377,15 @@ export async function extractLeafletProducts(input: ExtractLeafletInput): Promis
     '• widać CENĘ REGULARNĄ + procent (bez ceny po obniżce) → price_promo = price_regular × (1 − procent/100);',
     '• TYLKO gdy nie ma ŻADNEJ ceny w zł (sam procent) → pomiń produkt.',
     'price_promo ZAWSZE jako liczba w PLN, nigdy jako procent. Nie pomijaj produktu tylko dlatego, że brakuje ceny regularnej — dolicz ją.',
-    '(„drugi −50%", „2. sztuka taniej", „2+1 gratis" to condition_type="wielosztuka" — inna kategoria, nie zwykła obniżka.)',
+    'GDY NIE DA SIĘ USTALIĆ price_regular (brak ceny regularnej i brak procentu) → POMIŃ produkt.',
+    '  Promocja bez ceny sprzed obniżki jest dla nas bezużyteczna — nie ma czego porównać.',
+    '',
+    'UWAGA NA OFERTY WIELOSZTUKOWE — to najczęstszy błąd odczytu:',
+    '  „drugi za 1 zł", „druga sztuka 50% taniej", „2+1 gratis", „3 za 2", „przy zakupie 2 szt."',
+    '  Cena z takiego napisu (np. owo 1 zł) NIE JEST ceną produktu — to cena kolejnej sztuki.',
+    '  Ustaw condition_type="wielosztuka" i min_quantity, a jako price_promo podaj cenę',
+    '  PIERWSZEJ sztuki, jeśli jest widoczna. NIGDY nie wpisuj ceny drugiej sztuki jako price_promo',
+    '  i nie oznaczaj takiej oferty jako condition_type="brak".',
     `Daty w formacie YYYY-MM-DD (brakujący rok = ${new Date().getFullYear()}).`,
     'PRIORYTET DAT: napis „OFERTA OD dd.mm DO dd.mm" (lub podobny) wydrukowany PRZY danym produkcie to termin TEGO',
     'produktu — użyj go jako valid_from/valid_to, a NIE ogólnego terminu gazetki, nawet gdy różni się od innych produktów.',
@@ -395,7 +405,36 @@ export async function extractLeafletProducts(input: ExtractLeafletInput): Promis
   if (response.stop_reason === 'refusal') throw new Error('Model odmówił odczytu.')
   const parsed = JSON.parse(firstText(response))
   const all = Array.isArray(parsed.products) ? parsed.products : []
-  // Bierzemy tylko promocje CENOWE (zwykłą obniżkę, także „z kartą").
-  // Odrzucamy wielosztuki/„2+1"/„3 za 2" i inne warunki złożone.
-  return all.filter((p: any) => p.condition_type === 'brak' || p.condition_type === 'karta')
+  return all.filter(isUsablePromo)
+}
+
+// Oferty wielosztukowe rozpoznajemy po treści, a nie tylko po tym, co zaklasyfikował
+// model: „drugi za 1 zł" potrafi wrócić jako condition_type="brak" z price_promo=1,
+// czyli 1 zł ląduje w serwisie jako cena produktu. Tego nie wolno wpuścić.
+const MULTIBUY =
+  /(\bdrug[aie]\b|\btrzeci\w*\b|\bkolejn\w+\b|\bnastępn\w+\b|\bprzy zakupie\b|\b\d\s*\+\s*\d\b|\b\d\s*za\s*\d\b|\bgratis\b|\bza pół ceny\b|\b\d\s*szt\w*\s*(taniej|w cenie)\b)/i
+
+// Powyżej tego progu „obniżka" to niemal zawsze źle odczytana wielosztuka
+// (np. 1 zł przy regularnych 8 zł to −87%). Prawdziwe gazetkowe rabaty rzadko
+// przekraczają 70%, a lepiej pominąć okazję niż pokazać zmyśloną cenę.
+const MAX_PLAUSIBLE_DISCOUNT = 0.8
+
+export function isUsablePromo(p: any): boolean {
+  // 1. Tylko zwykła obniżka albo cena z kartą lojalnościową
+  if (p?.condition_type !== 'brak' && p?.condition_type !== 'karta') return false
+
+  // 2. Cena promocyjna musi być wiarygodną kwotą
+  if (typeof p.price_promo !== 'number' || p.price_promo < MIN_PLAUSIBLE_PRICE) return false
+
+  // 3. Bez ceny sprzed obniżki nie ma jak pokazać oszczędności — a to sedno serwisu
+  if (typeof p.price_regular !== 'number' || p.price_regular <= p.price_promo) return false
+
+  // 4. Wielosztuka przebrana za zwykłą cenę — po nazwie, treści warunku i liczbie sztuk
+  if (MULTIBUY.test(`${p.name ?? ''} ${p.condition_note ?? ''}`)) return false
+  if (typeof p.min_quantity === 'number' && p.min_quantity > 1) return false
+
+  // 5. Rabat nie z tego świata = najpewniej cena drugiej sztuki
+  if (1 - p.price_promo / p.price_regular > MAX_PLAUSIBLE_DISCOUNT) return false
+
+  return true
 }
