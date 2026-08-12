@@ -71,10 +71,12 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
             </div>
           )}
 
-          {/* Odznaka sklepu — logo na białym kaflu (fallback: kolor + nazwa) */}
+          {/* Odznaka sklepu — logo na białym kaflu (fallback: kolor + nazwa).
+              Sklep to pierwsza rzecz, po której użytkownik ocenia, czy przepis go dotyczy
+              („robię zakupy w Biedronce"), więc logo jest wyraźne, a nie ledwo widoczne. */}
           {recipe.store && (
-            <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 bg-white/95 rounded-lg px-2 py-1 shadow-sm text-xs font-semibold text-stone-700">
-              <StoreLogo slug={recipe.store.slug} name={recipe.store.name} className="h-4 w-auto max-w-[4.5rem] object-contain" />
+            <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 bg-white/95 rounded-xl px-2.5 py-1.5 shadow-sm text-xs font-semibold text-stone-700">
+              <StoreLogo slug={recipe.store.slug} name={recipe.store.name} className="h-7 w-auto max-w-[7rem] object-contain" />
             </div>
           )}
 

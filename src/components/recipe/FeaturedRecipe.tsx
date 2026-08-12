@@ -38,9 +38,11 @@ export function FeaturedRecipe({ recipe }: { recipe: Recipe }) {
             </div>
           )}
 
+          {/* Logo o stopień większe niż na zwykłym kafelku — afisz jest największą kartą
+              na stronie, więc mniejsze niż w siatce wyglądałoby na pomyłkę. */}
           {recipe.store && (
-            <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 bg-white/95 rounded-lg px-2.5 py-1.5 shadow-sm text-xs font-semibold text-stone-700">
-              <StoreLogo slug={recipe.store.slug} name={recipe.store.name} className="h-5 w-auto max-w-[5.5rem] object-contain" />
+            <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 bg-white/95 rounded-xl px-3 py-2 shadow-sm text-xs font-semibold text-stone-700">
+              <StoreLogo slug={recipe.store.slug} name={recipe.store.name} className="h-8 w-auto max-w-[8rem] object-contain" />
             </div>
           )}
 
