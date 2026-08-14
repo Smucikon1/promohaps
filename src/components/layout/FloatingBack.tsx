@@ -28,14 +28,21 @@ export function FloatingBack() {
   }
 
   return (
-    <a
-      href="/"
-      onClick={onClick}
-      aria-label="Wróć"
-      className="no-print fixed top-20 left-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-white/95 backdrop-blur-md border border-stone-200 shadow-sm px-4 py-2 text-sm font-semibold text-stone-700 hover:border-stone-300 hover:bg-white transition-colors"
-    >
-      <ArrowLeft className="w-4 h-4" />
-      Wróć
-    </a>
+    <>
+      {/* Przycisk jest pozycjonowany na sztywno, więc sam z siebie nie zajmuje miejsca
+          w układzie i kładł się na treści pod nagłówkiem — na wąskich ekranach zasłaniał
+          tagi kategorii. Ten odstęp rezerwuje dokładnie tyle wysokości, ile zajmuje. */}
+      <div aria-hidden="true" className="no-print h-14" />
+
+      <a
+        href="/"
+        onClick={onClick}
+        aria-label="Wróć"
+        className="no-print fixed top-20 left-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-white/95 backdrop-blur-md border border-stone-200 shadow-sm px-4 py-2 text-sm font-semibold text-stone-700 hover:border-stone-300 hover:bg-white transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Wróć
+      </a>
+    </>
   )
 }

@@ -82,6 +82,36 @@ const MEALS = ['obiad', 'kolacja', 'śniadanie', 'szybki lunch', 'danie na wynos
 
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)]
 
+// Przepis powstaje dziś i dziś trafia do gazetki, więc ma pasować do pory roku.
+// Grzane rosoły w lipcu i zimne sałatki w styczniu odrzucają czytelnika,
+// a poza tym sezonowe warzywa są wtedy najtańsze — czyli zgodne z sensem serwisu.
+const SEASONS: Record<string, { pora: string; opis: string }> = {
+  zima: {
+    pora: 'zima',
+    opis: 'dania rozgrzewające i sycące: zupy, gulasze, pieczenie, kapusta, buraki, korzeniowe, kiszonki',
+  },
+  wiosna: {
+    pora: 'wiosna',
+    opis: 'lżejsze dania, młode warzywa: szparagi, rzodkiewka, botwina, młoda kapusta, szczypiorek, nowalijki',
+  },
+  lato: {
+    pora: 'lato',
+    opis: 'dania lekkie i chłodne, krótkie gotowanie: sałatki, grill, chłodniki, pomidory, ogórki, cukinia, owoce sezonowe',
+  },
+  jesien: {
+    pora: 'jesień',
+    opis: 'dania cieplejsze, ale nie ciężkie: dynia, grzyby, jabłka, śliwki, pieczone warzywa korzeniowe, kasze',
+  },
+}
+
+function currentSeason(now = new Date()) {
+  const m = now.getMonth() + 1
+  if (m === 12 || m <= 2) return SEASONS.zima
+  if (m <= 5) return SEASONS.wiosna
+  if (m <= 8) return SEASONS.lato
+  return SEASONS.jesien
+}
+
 export async function generateRecipeJson(input: GenerateRecipeInput): Promise<any> {
   const {
     storeSlug, storeName, theme, categorySlugs = [], promoProducts = [],
@@ -224,10 +254,19 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     '   fresh parsley, rustic wooden table, soft natural window light, shallow depth of field".',
     '  Bez ludzi, bez rąk, bez napisów i logotypów. Ma wyglądać jak zdjęcie z bloga kulinarnego,',
     '  nie jak render 3D ani zdjęcie stockowe z lat 2000.',
+    '',
+    'SEZON (pole „sezon" w danych) — przepis czytany jest teraz, więc ma pasować do pory roku:',
+    '  charakter dania i warzywa dobieraj do podanej pory. Nie proponuj grzejących gulaszy',
+    '  i grochówek w lipcu ani chłodników i sałatek z pomidorów w styczniu.',
+    '  Sezonowe warzywa są wtedy najtańsze, więc to gra też na cenę.',
+    '  Jeśli pole „temat" narzuca coś innego, temat jest ważniejszy.',
   ].join('\n')
+
+  const season = currentSeason()
 
   const payload = {
     sklep: { slug: storeSlug, nazwa: storeName },
+    sezon: { pora: season.pora, miesiac: new Date().toLocaleDateString('pl-PL', { month: 'long' }), pasuje: season.opis },
     temat: theme || '(dowolny — dobierz apetyczny, tani przepis)',
     wytyczne: theme
       ? '(temat nadrzędny — kieruj się tematem)'

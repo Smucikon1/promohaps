@@ -297,6 +297,14 @@ export default async function HomePage({ searchParams }: HomeProps) {
   // Sklepy i kategorie nie zależą od filtrów — lecą z cache, nie z bazy przy każdym kliknięciu
   const [stores, categories] = await Promise.all([cachedStores(), cachedCategories()])
 
+  // Po zawężeniu wyników sekcje polecane („Przepis tygodnia", „Ostatnia szansa",
+  // „Najtańsze") ignorowałyby filtr i mieszały do wyników przepisy, których
+  // użytkownik właśnie nie chciał. Przy aktywnym filtrze pokazujemy samą siatkę.
+  const filtered = Boolean(
+    params.store || params.category || params.difficulty || params.search ||
+    params.maxPrice || params.airfryer || params.ending
+  )
+
   return (
     <div>
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -322,16 +330,22 @@ export default async function HomePage({ searchParams }: HomeProps) {
           </Suspense>
 
           {/* Przepis tygodnia pod filtrami */}
-          <Suspense fallback={<FeaturedSkeleton />}>
-            <FeaturedSection />
-          </Suspense>
+          {!filtered && (
+            <Suspense fallback={<FeaturedSkeleton />}>
+              <FeaturedSection />
+            </Suspense>
+          )}
 
           {/* Pilność ponad siatką — wygasające promocje są najkrócej dostępne */}
-          <Suspense fallback={<SectionSkeleton height={320} />}>
-            <EndingSoonSection />
-          </Suspense>
+          {!filtered && (
+            <Suspense fallback={<SectionSkeleton height={320} />}>
+              <EndingSoonSection />
+            </Suspense>
+          )}
 
-          <h2 className="text-xl font-bold text-stone-900 mb-5" style={{ fontFamily: 'var(--font-serif)' }}>Przepisy z promocji</h2>
+          <h2 className="text-xl font-bold text-stone-900 mb-5" style={{ fontFamily: 'var(--font-serif)' }}>
+            {filtered ? 'Wyniki' : 'Przepisy z promocji'}
+          </h2>
 
           {/* Bez key: React trzyma poprzednią siatkę do czasu gotowości nowej,
               więc nic nie mruga szkieletem przy każdym kliknięciu. */}
@@ -346,9 +360,11 @@ export default async function HomePage({ searchParams }: HomeProps) {
 
         {/* Najtańsze — jedyna sekcja stała pod siatką. Kolekcje i linki kategorii
             usunięte: kategorie są już w filtrach, więc dublowały nawigację. */}
-        <div className="mt-14">
-          <Suspense fallback={<SectionSkeleton height={320} />}><CheapestSection /></Suspense>
-        </div>
+        {!filtered && (
+          <div className="mt-14">
+            <Suspense fallback={<SectionSkeleton height={320} />}><CheapestSection /></Suspense>
+          </div>
+        )}
 
         <RecentlyViewed />
       </div>
