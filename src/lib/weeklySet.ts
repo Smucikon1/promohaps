@@ -77,9 +77,40 @@ function itemsOf(recipe: SetRecipe): { key: string; name: string; price: number 
     .filter((i) => i.key.length > 0)
 }
 
-// Ile nowych (jeszcze nieopłaconych) pozycji dołoży ten przepis do koszyka
-function marginalCost(recipe: SetRecipe, alreadyBought: Set<string>): number {
-  return itemsOf(recipe).reduce((sum, i) => (alreadyBought.has(i.key) ? sum : sum + i.price), 0)
+// Ile przepisów realnie wyżywi jedno opakowanie produktu pobocznego. Paczka jajek
+// czy kostka masła starczy na kilka dań, ale nie na dowolnie wiele — po tylu
+// przepisach doliczamy kolejne opakowanie.
+const SHARE_LIMIT = 3
+
+// Najdroższy składnik przepisu to praktycznie zawsze jego trzon (mięso, ryba).
+// Jedna karkówka NIE wystarczy na pięć obiadów, więc trzon każdego dania kupujemy
+// osobno. Dzielimy tylko dodatki. Lepiej pokazać kwotę odrobinę wyższą niż taką,
+// przy której zabraknie przy kasie.
+function coreKey(recipe: SetRecipe): string | null {
+  const items = itemsOf(recipe)
+  if (items.length === 0) return null
+  return items.reduce((max, i) => (i.price > max.price ? i : max)).key
+}
+
+// Ile dołoży do koszyka dorzucenie tego przepisu przy obecnym stanie zakupów.
+// `usedBy` mówi, ile przepisów korzysta już z danego produktu jako dodatku.
+function marginalCost(recipe: SetRecipe, usedBy: Map<string, number>): number {
+  const core = coreKey(recipe)
+  return itemsOf(recipe).reduce((sum, i) => {
+    if (i.key === core) return sum + i.price // trzon dania — zawsze własne opakowanie
+    const used = usedBy.get(i.key) ?? 0
+    // Nowe opakowanie potrzebne, gdy poprzednie „się skończyło"
+    return used % SHARE_LIMIT === 0 ? sum + i.price : sum
+  }, 0)
+}
+
+// Zapisuje zużycie dodatków po dołączeniu przepisu do zestawu
+function commitUsage(recipe: SetRecipe, usedBy: Map<string, number>) {
+  const core = coreKey(recipe)
+  for (const i of itemsOf(recipe)) {
+    if (i.key === core) continue
+    usedBy.set(i.key, (usedBy.get(i.key) ?? 0) + 1)
+  }
 }
 
 /**
@@ -94,13 +125,13 @@ export function buildWeeklySet(candidates: SetRecipe[], size = 5): WeeklySet | n
   if (usable.length < 2) return null
 
   const chosen: SetRecipe[] = []
-  const bought = new Set<string>()
+  const usedBy = new Map<string, number>()
   let cost = 0
 
   // Start: najtańszy przepis — zestaw ma być tani od pierwszego dania
   const first = usable.reduce((min, r) => ((r.price_total ?? 0) < (min.price_total ?? 0) ? r : min))
   chosen.push(first)
-  for (const i of itemsOf(first)) bought.add(i.key)
+  commitUsage(first, usedBy)
   cost = first.price_total ?? 0
 
   while (chosen.length < size) {
@@ -109,9 +140,9 @@ export function buildWeeklySet(candidates: SetRecipe[], size = 5): WeeklySet | n
     if (rest.length === 0) break
 
     let best = rest[0]
-    let bestCost = marginalCost(best, bought)
+    let bestCost = marginalCost(best, usedBy)
     for (const r of rest.slice(1)) {
-      const c = marginalCost(r, bought)
+      const c = marginalCost(r, usedBy)
       if (c < bestCost) {
         best = r
         bestCost = c
@@ -119,16 +150,21 @@ export function buildWeeklySet(candidates: SetRecipe[], size = 5): WeeklySet | n
     }
 
     chosen.push(best)
-    for (const i of itemsOf(best)) bought.add(i.key)
+    commitUsage(best, usedBy)
     cost += bestCost
   }
 
   if (chosen.length < 2) return null
 
-  // Produkty, które pojawiły się w więcej niż jednym przepisie — to one dają oszczędność
+  // Do „kupujesz raz" trafiają tylko dodatki realnie dzielone między dania.
+  // Trzon każdego przepisu (najdroższy składnik) jest kupowany osobno, więc
+  // nie jest niczym współdzielonym i nie ma go na tej liście.
+  const cores = new Set(chosen.map(coreKey).filter(Boolean) as string[])
   const seen = new Map<string, { name: string; count: number }>()
   for (const r of chosen) {
+    const core = coreKey(r)
     for (const i of new Map(itemsOf(r).map((x) => [x.key, x])).values()) {
+      if (i.key === core) continue
       const entry = seen.get(i.key)
       if (entry) entry.count += 1
       else seen.set(i.key, { name: i.name, count: 1 })
@@ -137,6 +173,7 @@ export function buildWeeklySet(candidates: SetRecipe[], size = 5): WeeklySet | n
   const sharedProducts = [...seen.values()]
     .filter((x) => x.count > 1 && !isPantry(x.name))
     .map((x) => x.name)
+    .filter((name) => !cores.has(productKey(name)))
 
   const costSeparately = chosen.reduce((s, r) => s + (r.price_total ?? 0), 0)
   const promoSavings = chosen.reduce(

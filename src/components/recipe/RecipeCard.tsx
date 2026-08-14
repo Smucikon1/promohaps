@@ -156,7 +156,7 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
                 <div className="flex items-end justify-between gap-2">
                   <div className="min-w-0">
                     <span className="block text-xs font-medium text-stone-500">Zakupy</span>
-                    <span className="block text-[10px] text-stone-400">tyle zapłacisz w sklepie</span>
+                    <span className="block text-[10px] text-stone-400">cena orientacyjna</span>
                   </div>
                   <div className="flex flex-col items-end flex-shrink-0">
                     <span className="text-xl font-bold text-amber-600" style={{ fontFamily: 'var(--font-serif)' }}>

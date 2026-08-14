@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { PiggyBank, Recycle, Users, ShoppingBasket } from 'lucide-react'
+import { PiggyBank, Recycle, Users, ShoppingBasket, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { dedupeRecipes } from '@/lib/recipeDedupe'
@@ -24,7 +24,10 @@ const SET_SIZE = 5
 
 // Kreator w adresie, nie w stanie klienta: gotowy zestaw da się wysłać znajomemu
 // albo wrócić do niego z zakładek, a strona zostaje renderowana po stronie serwera.
-type SetParams = { sklep?: string; dieta?: string }
+// `pomin` = lista odrzuconych przepisów. Zamiana dania to po prostu dopisanie go tutaj
+// i przebudowanie zestawu bez niego — dzięki temu wynik dalej siedzi w adresie
+// i da się go wysłać albo odświeżyć bez utraty wyborów.
+type SetParams = { sklep?: string; dieta?: string; pomin?: string }
 
 const DAYS = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek']
 
@@ -75,7 +78,8 @@ export default async function WeeklySetPage({
 }: {
   searchParams: Promise<SetParams>
 }) {
-  const { sklep, dieta } = await searchParams
+  const { sklep, dieta, pomin } = await searchParams
+  const skipped = new Set((pomin ?? '').split(',').filter(Boolean))
   const supabase = await createClient()
   const hidden = await expiredRecipeIds()
 
@@ -213,8 +217,19 @@ export default async function WeeklySetPage({
   }
 
   // ── Krok 3: zestaw ─────────────────────────────────────────────────────────
-  const pool = dieta === 'wege' ? picked.wege : picked.all
+  const fullPool = dieta === 'wege' ? picked.wege : picked.all
+  // Odrzucone dania wypadają z puli. Gdyby przez to zabrakło przepisów na zestaw,
+  // ignorujemy odrzucenia zamiast pokazywać pustą stronę — użytkownik zobaczy
+  // wtedy podpowiedź, że wrócił do pełnej puli.
+  const trimmed = fullPool.filter((r: any) => !skipped.has(r.id))
+  const poolExhausted = skipped.size > 0 && trimmed.length < MIN_FOR_SET
+  const pool = poolExhausted ? fullPool : trimmed
   const set = buildWeeklySet(pool, SET_SIZE)
+
+  // Adres bazowy do budowania linków „Zamień"
+  const baseParams = `sklep=${sklep}&dieta=${dieta}`
+  const swapHref = (id: string) =>
+    `/zestaw?${baseParams}&pomin=${[...skipped, id].join(',')}`
 
   if (!set || set.recipes.length < MIN_FOR_SET) {
     return (
@@ -270,6 +285,7 @@ export default async function WeeklySetPage({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         <div className="bg-white rounded-2xl border border-stone-100 p-4">
           <div className="text-xs text-stone-500 mb-1">Zapłacisz</div>
+          <div className="text-[10px] text-stone-400 -mt-1 mb-1">cena orientacyjna</div>
           <div className="text-2xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>
             {formatPrice(set.cost)}
           </div>
@@ -362,13 +378,37 @@ export default async function WeeklySetPage({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {set.recipes.map((r: any, i: number) => (
           <div key={r.id}>
-            <div className="text-xs font-semibold uppercase tracking-wider text-stone-400 mb-2">
-              {DAYS[i] ?? `Dzień ${i + 1}`}
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+                {DAYS[i] ?? `Dzień ${i + 1}`}
+              </span>
+              {/* Odrzucenie dania dopisuje je do „pomin" i przelicza cały zestaw —
+                  reszta dni może się przy tym zmienić, bo dobór szuka wspólnych produktów. */}
+              <Link
+                href={swapHref(r.id)}
+                scroll={false}
+                aria-label={`Zamień danie: ${r.title}`}
+                className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-500 hover:border-[#12b76a] hover:text-[#12b76a] transition-colors"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Zamień
+              </Link>
             </div>
             <RecipeCard recipe={r} index={i} />
           </div>
         ))}
       </div>
+
+      {skipped.size > 0 && (
+        <p className="mt-5 text-sm text-stone-500">
+          {poolExhausted
+            ? 'Skończyły się dania do podmiany — wróciliśmy do pełnej puli.'
+            : `Odrzucone dania: ${skipped.size}.`}{' '}
+          <Link href={`/zestaw?${baseParams}`} className="text-[#12b76a] font-medium hover:underline">
+            Zacznij od nowa
+          </Link>
+        </p>
+      )}
 
       <p className="mt-8 text-[11px] text-stone-400 leading-relaxed">
         Ceny są <strong>orientacyjne</strong> — obliczone na podstawie cen z gazetek promocyjnych i typowych
