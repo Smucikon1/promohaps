@@ -57,7 +57,9 @@ export function Header() {
           <span className="text-[#161918]">Gazetki</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-stone-600">
+        {/* ml-auto dosuwa nawigację do prawej, obok ikon. Bez tego justify-between
+            rozrzucał trzy elementy równomiernie i link lądował na środku paska. */}
+        <nav className="hidden md:flex items-center gap-6 ml-auto mr-5 text-sm font-medium text-stone-600">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
