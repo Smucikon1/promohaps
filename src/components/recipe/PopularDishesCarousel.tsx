@@ -51,7 +51,7 @@ export function PopularDishesCarousel({ recipes }: { recipes: Recipe[] }) {
         <div className="flex items-center gap-2">
           <ChefHat className="w-5 h-5 text-[#12b76a]" />
           <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>
-            Najpopularniejsze dania
+            Klasyczne dania
           </h2>
         </div>
 

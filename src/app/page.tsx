@@ -297,7 +297,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
   // Sklepy i kategorie nie zależą od filtrów — lecą z cache, nie z bazy przy każdym kliknięciu
   const [stores, categories] = await Promise.all([cachedStores(), cachedCategories()])
 
-  // Po zawężeniu wyników sekcje polecane („Najpopularniejsze dania", „Ostatnia szansa",
+  // Po zawężeniu wyników sekcje polecane („Klasyczne dania", „Ostatnia szansa",
   // „Najtańsze") ignorowałyby filtr i mieszały do wyników przepisy, których
   // użytkownik właśnie nie chciał. Przy aktywnym filtrze pokazujemy samą siatkę.
   const filtered = Boolean(
