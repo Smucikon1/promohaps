@@ -51,8 +51,12 @@ export const metadata: Metadata = {
   applicationName: 'zGazetki',
   appleWebApp: { capable: true, title: 'zGazetki', statusBarStyle: 'default' },
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    // Safari nie renderuje SVG jako ikony na ekranie głównym — musi być PNG
+    apple: '/apple-icon.png',
   },
 }
 

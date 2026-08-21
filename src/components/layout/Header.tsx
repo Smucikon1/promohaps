@@ -44,17 +44,12 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-stone-100">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logotyp jako tekst, nie obrazek: SVG wczytany przez <img> nie ma dostępu
-            do webfontów strony, więc krój podmieniłby się na systemowy. Tak dostajemy
-            wczytany Outfit i ostrość na każdym ekranie. */}
-        <Link
-          href="/"
-          aria-label="zGazetki — strona główna"
-          className="flex items-center text-[1.6rem] font-bold leading-none tracking-tight"
-          style={{ fontFamily: 'var(--font-serif)' }}
-        >
-          <span className="text-[#12b76a]">z</span>
-          <span className="text-[#161918]">Gazetki</span>
+        {/* Wordmark jako plik SVG. Wcześniej był składany z tekstu HTML, bo obrazek
+            nie miałby dostępu do webfontów strony — w nowym pliku litery są już
+            konturami, więc problem znika, a znak jest dokładnie taki jak w źródle. */}
+        <Link href="/" aria-label="zGazetki — strona główna" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="zGazetki" className="h-6 sm:h-8 w-auto" />
         </Link>
 
         {/* Zeszło tu z hero na stronie głównej. Na telefonie ciaśniej i mniejszym

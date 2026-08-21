@@ -12,9 +12,14 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#12b76a',
     lang: 'pl',
     categories: ['food', 'lifestyle', 'shopping'],
+    // Chrome na Androidzie uznaje aplikację za instalowalną dopiero, gdy manifest
+    // ma rastrowe ikony 192 i 512. Przy samym SVG kryterium nie było spełnione
+    // i przeglądarka nie proponowała instalacji po odinstalowaniu aplikacji.
     icons: [
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-      { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
     ],
   }
 }
