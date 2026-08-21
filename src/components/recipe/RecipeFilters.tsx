@@ -244,6 +244,21 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
     [[...activeStores].join(','), setParam]
   )
 
+  // Po zjechaniu w dół przyklejony pasek zwija się na telefonie do JEDNEJ linii:
+  // wybrany sklep plus reszta filtrów, przewijana w bok. Dwa rzędy przy górnej
+  // krawędzi zjadały na 800-pikselowym ekranie zbyt dużo miejsca na treść.
+  const [zwiniete, setZwiniete] = useState(false)
+  useEffect(() => {
+    const onScroll = () => setZwiniete(window.scrollY > 180)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Do zwiniętego paska bierzemy pierwszy zaznaczony sklep — na telefonie i tak
+  // można mieć tylko jeden.
+  const wybranySklep = stores.find((s) => activeStores.has(s.slug))
+
   const currentSort = SORT_OPTIONS.find((s) => s.value === activeSort) ?? SORT_OPTIONS[0]
   const currentDifficulty = DIFFICULTIES.find((d) => d.value === activeDifficulty)
   const currentCategory = categories.find((c) => c.slug === activeCategory)
@@ -252,7 +267,7 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
     <div className={cn('space-y-3 transition-opacity', isPending && 'opacity-60')}>
       {/* Sklepy — zawsze widoczne, wg popularności, poziomy scroll na mobile.
           Fade po prawej sygnalizuje, że da się przewinąć palcem/myszką. */}
-      <div className="relative -mx-1">
+      <div className={cn('relative -mx-1', zwiniete && 'hidden md:block')}>
         <div className="flex gap-2 overflow-x-auto no-scrollbar md:flex-wrap px-1 scroll-smooth snap-x">
           {sortByPopularity(stores).map((store) => {
             const active = activeStores.has(store.slug)
@@ -283,6 +298,34 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
       {/* Chip bar w stylu Uber Eats — pojedynczy pasek płaskich chip-ów z dropdownami */}
       <div className="relative -mx-1">
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-1 scroll-smooth snap-x">
+        {/* Wybrany sklep — widoczny tylko w zwiniętym pasku na telefonie.
+            Kliknięcie wraca na górę, gdzie pasek rozwija się z powrotem
+            i widać pełny wybór sklepów. */}
+        {zwiniete && (
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            aria-label={wybranySklep ? `Wybrany sklep: ${wybranySklep.name}. Pokaż wszystkie` : 'Pokaż wybór sklepów'}
+            className={cn(
+              'md:hidden flex-shrink-0 snap-start inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors',
+              wybranySklep
+                ? 'bg-[#e6f9f0] border-[#12b76a] text-[#0c7d49]'
+                : 'bg-white border-stone-200 text-stone-700'
+            )}
+          >
+            {wybranySklep ? (
+              <StoreLogo
+                slug={wybranySklep.slug}
+                name={wybranySklep.name}
+                className="h-5 w-auto max-w-[4.5rem] object-contain"
+              />
+            ) : (
+              <span>Sklepy</span>
+            )}
+            <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
+          </button>
+        )}
+
         {/* Sortuj */}
         <FilterChip
           label={currentSort.label}

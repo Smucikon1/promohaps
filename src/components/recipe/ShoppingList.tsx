@@ -91,13 +91,24 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [], promoL
       <span className="flex-1 min-w-0">
         <span
           className={cn(
-            'text-sm transition-all flex items-center gap-1.5',
+            'text-sm transition-all flex items-start gap-1.5',
             item.checked ? 'line-through text-stone-400' : item.isPromo ? 'text-amber-900 font-medium' : 'text-stone-700'
           )}
         >
-          {item.isPromo && <Tag className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
-          <span className="truncate">{item.name}</span>
+          {item.isPromo && <Tag className="w-3.5 h-3.5 mt-0.5 text-amber-500 flex-shrink-0" />}
+          {/* Bez truncate: nazwa produktu to jedyna informacja, po której poznajesz,
+              co masz kupić — ucięta „Polska ..." nie mówi nic. */}
+          <span className="break-words">{item.name}</span>
         </span>
+
+        {/* Gramatura zeszła tu spod ceny. Po prawej stronie siedziała w kolumnie
+            z flex-shrink-0, więc długi opis („1 kg (1 opakowanie, użyta 1 szt.)")
+            zabierał całą szerokość i ściskał nazwę do kilku znaków. */}
+        {(item.amount || item.unit) && (
+          <span className="block text-xs text-stone-500">
+            {item.amount} {item.unit}
+          </span>
+        )}
         {item.isPromo && (
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] uppercase tracking-wide text-amber-600 font-semibold">z gazetki</span>
@@ -116,9 +127,6 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [], promoL
       </span>
 
       <span className="text-right flex-shrink-0 leading-tight">
-        {(item.amount || item.unit) && (
-          <span className="block text-xs text-stone-500">{item.amount} {item.unit}</span>
-        )}
         {item.price != null && (
           <span className={cn('block text-sm font-semibold', item.isPromo ? 'text-amber-600' : 'text-stone-700')}>
             {formatPrice(item.price)}
