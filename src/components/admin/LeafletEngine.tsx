@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { pickDistinctDishes, type SlotTag } from '@/lib/popularDishes'
 import { Loader2, ScanLine, Save, Sparkles, Trash2, ExternalLink, Archive } from 'lucide-react'
 import type { Store } from '@/types'
 
@@ -439,7 +440,8 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const generateOne = async (
     themeArg: string,
     used: string[],
-    promoOverride?: any[]
+    promoOverride?: any[],
+    avoidExtra: string[] = []
   ): Promise<{ draft: { id: string; title: string; editUrl: string; hasImage: boolean }; used: string[]; imageWarning?: string }> => {
     const res = await fetch('/api/generate-recipe-draft', {
       method: 'POST',
@@ -450,6 +452,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         theme: themeArg,
         promoProducts: promoOverride ?? promoPayload(),
         reuseProducts: used,
+        extraAvoidTitles: avoidExtra,
       }),
     })
     const isJson = res.headers.get('content-type')?.includes('application/json')
@@ -476,6 +479,81 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     } finally {
       setGenerating(false)
     }
+  }
+
+  // Zestaw 9 klasyków: 3 obiady, 2 fit, 2 zupy, 2 wege.
+  //
+  // Każdy slot dostaje z góry PRZYPISANE, inne danie z listy klasyków. Wcześniejsze
+  // podejście — ten sam temat wysłany trzy razy, w dodatku z prośbą o ponowne użycie
+  // tych samych produktów — dawało trzy warianty tego samego obiadu. Model robił
+  // dokładnie to, o co go proszono; problem był w zapytaniu, nie w modelu.
+  const SLOTY: { tag: SlotTag | null; ile: number; etykieta: string }[] = [
+    { tag: null, ile: 3, etykieta: 'polski klasyczny obiad' },
+    { tag: 'fit', ile: 2, etykieta: 'polski klasyczny obiad fit' },
+    { tag: 'zupa', ile: 2, etykieta: 'polska klasyczna zupa' },
+    { tag: 'wege', ile: 2, etykieta: 'polski klasyczny obiad wege' },
+  ]
+
+  const generateClassicSet = async () => {
+    if (promoPayload().length === 0) { setError('Najpierw odczytaj gazetkę lub wczytaj zapisane promocje.'); return }
+    setGenerating(true)
+    setError('')
+    setSavedMsg('')
+
+    // Tytuły już w katalogu tego sklepu — żeby nie zamawiać dania, które masz
+    const supabase = createClient()
+    const { data: istniejace } = await supabase
+      .from('recipes')
+      .select('title')
+      .eq('store_id', store?.id ?? '')
+      .limit(200)
+    const wKatalogu: string[] = (istniejace ?? []).map((r: any) => r.title).filter(Boolean)
+
+    // Dobór dań: nic się nie powtarza ani między slotami, ani z katalogiem
+    const zadania: { danie: string; opis: string; etykieta: string }[] = []
+    const zajete = [...wKatalogu]
+    for (const slot of SLOTY) {
+      for (const d of pickDistinctDishes(slot.ile, slot.tag, zajete)) {
+        zadania.push({ danie: d.nazwa, opis: d.opis, etykieta: slot.etykieta })
+        zajete.push(d.nazwa)
+      }
+    }
+
+    if (zadania.length === 0) {
+      setError('Brak dań do wygenerowania — wszystkie klasyki z tej pory roku są już w katalogu tego sklepu.')
+      setGenerating(false)
+      return
+    }
+
+    let used = [...usedProducts]
+    let tytuly: string[] = []
+    let failed = 0
+    let noImage = 0
+
+    for (let i = 0; i < zadania.length; i++) {
+      const z = zadania[i]
+      setBatchStatus(`Zestaw klasyków: ${i + 1}/${zadania.length} — ${z.danie}…`)
+      const temat =
+        `${z.etykieta}: ${z.danie} (${z.opis}). ` +
+        'Zrób to danie klasycznie, tak jak się je zna z domu. ' +
+        'Tytuł ma być rozpoznawalny od pierwszego spojrzenia.'
+      try {
+        const r = await generateOne(temat, used, undefined, tytuly)
+        used = r.used
+        tytuly = [...tytuly, r.draft.title]
+        setDrafts((d) => [r.draft, ...d])
+        if (r.imageWarning) noImage++
+      } catch {
+        failed++
+      }
+    }
+
+    setUsedProducts(used)
+    setImageNotice(noImage > 0 ? `${noImage} z ${zadania.length} przepisów powstało bez zdjęcia — dodasz je ręcznie przy akceptacji.` : '')
+    setBatchStatus('')
+    setGenerating(false)
+    if (failed > 0) setError(`Zestaw gotowy, ale ${failed} z ${zadania.length} przepisów się nie udało — spróbuj wygenerować je pojedynczo.`)
+    else setSavedMsg(`✅ Wygenerowano ${zadania.length} klasyków — sprawdź i opublikuj.`)
   }
 
   // Zestaw 12 szkiców — po jednym na każdy filtr serwisu
@@ -698,6 +776,15 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
             >
               {batchStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               Wygeneruj zestaw 12
+            </button>
+            <button
+              onClick={generateClassicSet}
+              disabled={generating}
+              title="9 przepisów: 3 klasyczne obiady, 2 fit, 2 zupy, 2 wege — każdy inne danie"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#12b76a] text-white text-sm font-semibold px-4 py-2.5 hover:bg-[#0ea25d] transition-colors disabled:opacity-50"
+            >
+              {batchStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Zestaw 9 klasyków
             </button>
           </div>
           {batchStatus && (

@@ -48,6 +48,9 @@ export interface PopularDish {
   core: string[]
   /** Pory roku, do których danie pasuje. Brak = cały rok. */
   sezon?: SeasonKey[]
+  /** Zupa / lekkie / bezmięsne — po tym dobieramy sloty w zestawie 9 klasyków.
+   *  Brak = zwykły obiad mięsny. */
+  tagi?: ('zupa' | 'fit' | 'wege')[]
   /** Desery są wyłączone z automatycznego doboru — generator szuka taniego OBIADU,
    *  a podsunięcie mu szarlotki dałoby deser w miejscu dania głównego. W panelu
    *  admina są dostępne normalnie, bo tam danie wybiera człowiek. */
@@ -59,19 +62,19 @@ export const POPULAR_DISHES: PopularDish[] = [
   { nazwa: 'kotlet schabowy', emoji: '🍖', opis: 'ziemniaki i mizeria albo kapusta', ranga: 5, core: ['schab'] },
   { nazwa: 'kotlety mielone', emoji: '🍗', opis: 'ziemniaki i buraczki albo mizeria', ranga: 5, core: ['mieso mielon', 'mielone wieprz', 'mielone wolow'] },
   { nazwa: 'spaghetti bolognese', emoji: '🍝', opis: 'makaron, mięso mielone, passata', ranga: 5, core: ['mieso mielon', 'mielone wieprz', 'passat', 'makaron'] },
-  { nazwa: 'zupa pomidorowa', emoji: '🍅', opis: 'z makaronem albo ryżem', ranga: 5, core: ['passat', 'koncentrat pomidor', 'pomidory w puszce'] },
-  { nazwa: 'nalesniki z serem', emoji: '🥞', opis: 'twaróg, mleko, jajka', ranga: 5, core: ['twarog', 'mleko', 'jajk'] },
-  { nazwa: 'rosol', emoji: '🍲', opis: 'klasyczny niedzielny obiad', ranga: 5, core: ['kurcz', 'wloszczyzn', 'porcja rosolow'], sezon: ['jesien', 'zima', 'wiosna'] },
+  { nazwa: 'zupa pomidorowa', emoji: '🍅', opis: 'z makaronem albo ryżem', ranga: 5, tagi: ['zupa', 'wege'], core: ['passat', 'koncentrat pomidor', 'pomidory w puszce'] },
+  { nazwa: 'nalesniki z serem', emoji: '🥞', opis: 'twaróg, mleko, jajka', ranga: 5, tagi: ['wege'], core: ['twarog', 'mleko', 'jajk'] },
+  { nazwa: 'rosol', emoji: '🍲', opis: 'klasyczny niedzielny obiad', ranga: 5, tagi: ['zupa', 'fit'], core: ['kurcz', 'wloszczyzn', 'porcja rosolow'], sezon: ['jesien', 'zima', 'wiosna'] },
 
   // --- ranga 4: bardzo częste, tydzień w tydzień ---
-  { nazwa: 'placki ziemniaczane', emoji: '🥔', opis: 'ze śmietaną, cukrem albo sosem', ranga: 4, core: ['ziemniak'] },
-  { nazwa: 'pierogi ruskie', emoji: '🥟', opis: 'ziemniaki, twaróg, cebula', ranga: 4, core: ['twarog', 'ziemniak'] },
+  { nazwa: 'placki ziemniaczane', emoji: '🥔', opis: 'ze śmietaną, cukrem albo sosem', ranga: 4, tagi: ['wege'], core: ['ziemniak'] },
+  { nazwa: 'pierogi ruskie', emoji: '🥟', opis: 'ziemniaki, twaróg, cebula', ranga: 4, tagi: ['wege'], core: ['twarog', 'ziemniak'] },
   { nazwa: 'pierogi z miesem', emoji: '🥟', opis: 'farsz z mięsa i cebuli', ranga: 4, core: ['mieso mielon', 'lopatk', 'maka pszen'] },
-  { nazwa: 'udka pieczone', emoji: '🍗', opis: 'pieczone z ziemniakami', ranga: 4, core: ['udk', 'podudz', 'cwiartk'] },
-  { nazwa: 'kurczak pieczony', emoji: '🍗', opis: 'z ziemniakami z pieca', ranga: 4, core: ['kurcz', 'filet z kurcz'] },
-  { nazwa: 'kotlet z piersi kurczaka', emoji: '🍗', opis: 'panierowany, z surówką', ranga: 4, core: ['filet z kurcz', 'piers z kurcz'] },
+  { nazwa: 'udka pieczone', emoji: '🍗', opis: 'pieczone z ziemniakami', ranga: 4, tagi: ['fit'], core: ['udk', 'podudz', 'cwiartk'] },
+  { nazwa: 'kurczak pieczony', emoji: '🍗', opis: 'z ziemniakami z pieca', ranga: 4, tagi: ['fit'], core: ['kurcz', 'filet z kurcz'] },
+  { nazwa: 'kotlet z piersi kurczaka', emoji: '🍗', opis: 'panierowany, z surówką', ranga: 4, tagi: ['fit'], core: ['filet z kurcz', 'piers z kurcz'] },
   { nazwa: 'klopsiki w sosie pomidorowym', emoji: '🍲', opis: 'mięso mielone w sosie', ranga: 4, core: ['mieso mielon', 'mielone wieprz', 'passat', 'koncentrat pomidor'] },
-  { nazwa: 'zupa ogorkowa', emoji: '🥒', opis: 'na ogórkach kiszonych', ranga: 4, core: ['ogorki kiszon', 'ogorek kiszon'] },
+  { nazwa: 'zupa ogorkowa', emoji: '🥒', opis: 'na ogórkach kiszonych', ranga: 4, tagi: ['zupa', 'fit'], core: ['ogorki kiszon', 'ogorek kiszon'] },
   { nazwa: 'golabki', emoji: '🥬', opis: 'mięso i ryż w kapuście, sos pomidorowy', ranga: 4, core: ['mieso mielon', 'mielone wieprz', 'kapust', 'ryz'], sezon: ['jesien', 'zima'] },
   { nazwa: 'bigos', emoji: '🥬', opis: 'kapusta kiszona, mięso, kiełbasa, grzyby', ranga: 4, core: ['kapusta kiszon', 'kielbas'], sezon: ['jesien', 'zima'] },
   { nazwa: 'sernik', emoji: '🍰', opis: 'twarogowy, klasyczny', ranga: 4, core: ['twarog', 'jajk'], typ: 'deser' },
@@ -79,24 +82,24 @@ export const POPULAR_DISHES: PopularDish[] = [
 
   // --- ranga 3: solidna klasyka, ale rzadziej niż powyższe ---
   { nazwa: 'schab pieczony', emoji: '🥩', opis: 'w plastrach, na ciepło lub zimno', ranga: 3, core: ['schab'] },
-  { nazwa: 'jajko sadzone z ziemniakami', emoji: '🥚', opis: 'ziemniaki, jajko sadzone, mizeria', ranga: 3, core: ['jajk', 'ziemniak'] },
-  { nazwa: 'kopytka', emoji: '🥔', opis: 'z masłem albo sosem', ranga: 3, core: ['ziemniak', 'maka ziemniacz'] },
-  { nazwa: 'kluski slaskie', emoji: '🥔', opis: 'z sosem pieczeniowym', ranga: 3, core: ['ziemniak', 'maka ziemniacz'] },
+  { nazwa: 'jajko sadzone z ziemniakami', emoji: '🥚', opis: 'ziemniaki, jajko sadzone, mizeria', ranga: 3, tagi: ['wege'], core: ['jajk', 'ziemniak'] },
+  { nazwa: 'kopytka', emoji: '🥔', opis: 'z masłem albo sosem', ranga: 3, tagi: ['wege'], core: ['ziemniak', 'maka ziemniacz'] },
+  { nazwa: 'kluski slaskie', emoji: '🥔', opis: 'z sosem pieczeniowym', ranga: 3, tagi: ['wege'], core: ['ziemniak', 'maka ziemniacz'] },
   { nazwa: 'lazanki z kapusta', emoji: '🥬', opis: 'kapusta, kiełbasa, makaron', ranga: 3, core: ['kapust', 'kielbas', 'makaron'] },
-  { nazwa: 'potrawka z kurczaka z ryzem', emoji: '🍚', opis: 'w jasnym sosie, z ryżem', ranga: 3, core: ['kurcz', 'filet z kurcz', 'ryz'] },
-  { nazwa: 'makaron w sosie serowym', emoji: '🧀', opis: 'szybki obiad z serem', ranga: 3, core: ['makaron', 'ser zolty', 'serek'] },
-  { nazwa: 'zupa pieczarkowa', emoji: '🍄', opis: 'z pieczarkami i śmietaną', ranga: 3, core: ['pieczark'] },
-  { nazwa: 'salatka jarzynowa', emoji: '🥗', opis: 'warzywa, majonez, jajka', ranga: 3, core: ['marchew', 'majonez', 'wloszczyzn'] },
-  { nazwa: 'kapusta zasmazana', emoji: '🥬', opis: 'dodatek do mięsa', ranga: 3, core: ['kapust'] },
+  { nazwa: 'potrawka z kurczaka z ryzem', emoji: '🍚', opis: 'w jasnym sosie, z ryżem', ranga: 3, tagi: ['fit'], core: ['kurcz', 'filet z kurcz', 'ryz'] },
+  { nazwa: 'makaron w sosie serowym', emoji: '🧀', opis: 'szybki obiad z serem', ranga: 3, tagi: ['wege'], core: ['makaron', 'ser zolty', 'serek'] },
+  { nazwa: 'zupa pieczarkowa', emoji: '🍄', opis: 'z pieczarkami i śmietaną', ranga: 3, tagi: ['zupa', 'wege'], core: ['pieczark'] },
+  { nazwa: 'salatka jarzynowa', emoji: '🥗', opis: 'warzywa, majonez, jajka', ranga: 3, tagi: ['wege'], core: ['marchew', 'majonez', 'wloszczyzn'] },
+  { nazwa: 'kapusta zasmazana', emoji: '🥬', opis: 'dodatek do mięsa', ranga: 3, tagi: ['wege'], core: ['kapust'] },
   { nazwa: 'fasolka po bretonsku', emoji: '🫘', opis: 'fasola, kiełbasa, sos pomidorowy', ranga: 3, core: ['fasol', 'kielbas'], sezon: ['jesien', 'zima'] },
   { nazwa: 'gulasz wieprzowy', emoji: '🥩', opis: 'z ziemniakami, kaszą lub kluskami', ranga: 3, core: ['lopatk', 'kark', 'wolow'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'barszcz czerwony', emoji: '🍲', opis: 'na burakach', ranga: 3, core: ['burak'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'krupnik', emoji: '🍲', opis: 'kasza, warzywa, wywar', ranga: 3, core: ['kasza', 'wloszczyzn'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'grochowka', emoji: '🍲', opis: 'groch, kiełbasa, ziemniaki', ranga: 3, core: ['groch', 'kielbas', 'wloszczyzn'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'zurek', emoji: '🍲', opis: 'z białą kiełbasą i jajkiem', ranga: 3, core: ['zurek', 'kielbas', 'jajk'], sezon: ['wiosna', 'jesien', 'zima'] },
-  { nazwa: 'leczo', emoji: '🫑', opis: 'papryka, cukinia, kiełbasa', ranga: 3, core: ['papryk', 'cukini', 'kielbas'], sezon: ['lato', 'jesien'] },
-  { nazwa: 'racuchy z jablkami', emoji: '🥞', opis: 'smażone, z cukrem pudrem', ranga: 3, core: ['jablk', 'maka pszen'], sezon: ['lato', 'jesien'] },
-  { nazwa: 'makaron z truskawkami', emoji: '🍓', opis: 'ze śmietaną i cukrem', ranga: 3, core: ['truskaw', 'makaron'], sezon: ['lato'] },
+  { nazwa: 'barszcz czerwony', emoji: '🍲', opis: 'na burakach', ranga: 3, tagi: ['zupa', 'fit', 'wege'], core: ['burak'], sezon: ['jesien', 'zima'] },
+  { nazwa: 'krupnik', emoji: '🍲', opis: 'kasza, warzywa, wywar', ranga: 3, tagi: ['zupa'], core: ['kasza', 'wloszczyzn'], sezon: ['jesien', 'zima'] },
+  { nazwa: 'grochowka', emoji: '🍲', opis: 'groch, kiełbasa, ziemniaki', ranga: 3, tagi: ['zupa'], core: ['groch', 'kielbas', 'wloszczyzn'], sezon: ['jesien', 'zima'] },
+  { nazwa: 'zurek', emoji: '🍲', opis: 'z białą kiełbasą i jajkiem', ranga: 3, tagi: ['zupa'], core: ['zurek', 'kielbas', 'jajk'], sezon: ['wiosna', 'jesien', 'zima'] },
+  { nazwa: 'leczo', emoji: '🫑', opis: 'papryka, cukinia, kiełbasa', ranga: 3, tagi: ['fit', 'wege'], core: ['papryk', 'cukini', 'kielbas'], sezon: ['lato', 'jesien'] },
+  { nazwa: 'racuchy z jablkami', emoji: '🥞', opis: 'smażone, z cukrem pudrem', ranga: 3, tagi: ['wege'], core: ['jablk', 'maka pszen'], sezon: ['lato', 'jesien'] },
+  { nazwa: 'makaron z truskawkami', emoji: '🍓', opis: 'ze śmietaną i cukrem', ranga: 3, tagi: ['wege'], core: ['truskaw', 'makaron'], sezon: ['lato'] },
   { nazwa: 'paczki', emoji: '🍩', opis: 'drożdżowe, z lukrem', ranga: 3, core: ['maka pszen', 'drozdze', 'jajk'], typ: 'deser' },
   { nazwa: 'makowiec', emoji: '🍰', opis: 'drożdżowy, z masą makową', ranga: 3, core: ['masa makow', 'maka pszen', 'drozdze'], typ: 'deser' },
 
@@ -104,10 +107,10 @@ export const POPULAR_DISHES: PopularDish[] = [
   { nazwa: 'zrazy wolowe', emoji: '🥩', opis: 'zawijane, duszone w sosie', ranga: 2, core: ['wolow', 'zraz'], sezon: ['jesien', 'zima'] },
   { nazwa: 'pyzy z miesem', emoji: '🥟', opis: 'ziemniaczane, z farszem', ranga: 2, core: ['ziemniak', 'mieso mielon'] },
   { nazwa: 'zapiekanka ziemniaczana', emoji: '🥔', opis: 'z serem i kiełbasą', ranga: 2, core: ['ziemniak', 'ser zolty', 'kielbas'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'zapiekanka z pieczarkami', emoji: '🥖', opis: 'bagietka, pieczarki, ser', ranga: 2, core: ['pieczark', 'bagietk', 'ser zolty'] },
-  { nazwa: 'ryba po grecku', emoji: '🐟', opis: 'mintaj pod warzywami', ranga: 2, core: ['mintaj', 'mirun', 'dorsz'] },
-  { nazwa: 'chlodnik', emoji: '🥣', opis: 'botwina, kefir, jajko', ranga: 2, core: ['botwin', 'burak', 'kefir'], sezon: ['lato'] },
-  { nazwa: 'salatka grecka', emoji: '🥗', opis: 'pomidor, ogórek, feta', ranga: 2, core: ['pomidor', 'ogorek', 'ogorki', 'feta'], sezon: ['lato'] },
+  { nazwa: 'zapiekanka z pieczarkami', emoji: '🥖', opis: 'bagietka, pieczarki, ser', ranga: 2, tagi: ['wege'], core: ['pieczark', 'bagietk', 'ser zolty'] },
+  { nazwa: 'ryba po grecku', emoji: '🐟', opis: 'mintaj pod warzywami', ranga: 2, tagi: ['fit'], core: ['mintaj', 'mirun', 'dorsz'] },
+  { nazwa: 'chlodnik', emoji: '🥣', opis: 'botwina, kefir, jajko', ranga: 2, tagi: ['zupa', 'fit', 'wege'], core: ['botwin', 'burak', 'kefir'], sezon: ['lato'] },
+  { nazwa: 'salatka grecka', emoji: '🥗', opis: 'pomidor, ogórek, feta', ranga: 2, tagi: ['fit', 'wege'], core: ['pomidor', 'ogorek', 'ogorki', 'feta'], sezon: ['lato'] },
 ]
 
 // Nie zawsze klasyk: przy 100% katalog skurczyłby się do tych kilkudziesięciu pozycji
@@ -252,4 +255,52 @@ export function pickPopularDish(
     ranga: chosen.dish.ranga,
     matched: [...new Set(chosen.matched)].slice(0, 8),
   }
+}
+
+// ---------- Dobór zestawu różnych dań ----------
+
+export type SlotTag = 'zupa' | 'fit' | 'wege'
+
+/**
+ * Losuje zadaną liczbę RÓŻNYCH dań pasujących do slotu.
+ *
+ * Powstało po tym, jak generowanie zestawu zwracało powtórki: pętla wysyłała ten sam
+ * temat kilka razy i jeszcze prosiła o ponowne użycie tych samych produktów, więc model
+ * uczciwie robił za każdym razem to samo danie. Przypisanie konkretnego dania do slotu
+ * z góry usuwa problem u źródła, zamiast wyłapywać duplikaty po fakcie.
+ *
+ * Parametr wyklucz przyjmuje tytuły już obecne w katalogu — te dania nie wracają.
+ */
+export function pickDistinctDishes(
+  ile: number,
+  tag: SlotTag | null,
+  wyklucz: string[] = [],
+  now = new Date()
+): PopularDish[] {
+  const sezon = currentSeasonKey(now)
+  const pula = POPULAR_DISHES.filter((d) => {
+    if (d.typ === 'deser') return false
+    if (d.sezon && !d.sezon.includes(sezon)) return false
+    if (tag && !d.tagi?.includes(tag)) return false
+    // Zupa tylko w slocie zupy. Slot „obiad fit" i „obiad wege" to nadal OBIAD —
+    // bez tego zestaw dziewieciu dan potrafil zawierac cztery zupy zamiast dwoch.
+    if (tag !== 'zupa' && d.tagi?.includes('zupa')) return false
+    return !wyklucz.some((t) => dishMatchesTitle(d, t))
+  })
+
+  // Losowo, ale z przewagą kanonu: ta sama waga rangi co w automacie, tylko bez gazetki
+  const wybrane: PopularDish[] = []
+  const zostalo = [...pula]
+  while (wybrane.length < ile && zostalo.length > 0) {
+    const suma = zostalo.reduce((acc, d) => acc + d.ranga, 0)
+    let los = Math.random() * suma
+    let idx = zostalo.length - 1
+    for (let i = 0; i < zostalo.length; i++) {
+      los -= zostalo[i].ranga
+      if (los <= 0) { idx = i; break }
+    }
+    wybrane.push(zostalo[idx])
+    zostalo.splice(idx, 1)
+  }
+  return wybrane
 }

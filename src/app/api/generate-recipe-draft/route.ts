@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       theme: body.theme,
       promoProducts: body.promoProducts,
       reuseProducts: body.reuseProducts,
+      extraAvoidTitles: Array.isArray(body.extraAvoidTitles) ? body.extraAvoidTitles : [],
     })
     return NextResponse.json(wynik)
   } catch (e: any) {

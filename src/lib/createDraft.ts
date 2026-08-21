@@ -16,6 +16,9 @@ export interface DraftInput {
   theme?: string
   promoProducts?: any[]
   reuseProducts?: string[]
+  /** Tytuły wygenerowane przed chwilą w tej samej serii. Baza bywa o krok z tyłu,
+   *  a bez nich druga i trzecia pozycja zestawu potrafiły powtórzyć pierwszą. */
+  extraAvoidTitles?: string[]
   /**
    * Znacznik czasu (epoch ms), po którym nie zaczynamy już generować zdjęcia.
    * Cron ma 60 s na całe wywołanie razem ze sprzątaniem bazy, a to generacja tekstu
@@ -53,7 +56,10 @@ export async function createRecipeDraft(supabase: any, input: DraftInput): Promi
   // Tytuły z TEGO sklepu — model ma ich nie powtarzać, a generator sprawdza to twardo.
   // Sklep musi być znany przed generowaniem, żeby lista „unikaj" była właściwa.
   const targetStore = (stores ?? []).find((s: any) => s.slug === input.storeSlug)
-  const existingTitles = await fetchStoreTitles(supabase, targetStore?.id)
+  const existingTitles = [
+    ...(input.extraAvoidTitles ?? []),
+    ...(await fetchStoreTitles(supabase, targetStore?.id)),
+  ]
 
   let recipe: any
   try {
