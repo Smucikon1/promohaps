@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { RecipeBulkTable } from '@/components/admin/RecipeBulkTable'
-import { Plus } from 'lucide-react'
+import { Plus, ImageOff } from 'lucide-react'
 
 interface Props {
   searchParams: Promise<{ saved?: string; status?: string }>
@@ -19,6 +19,9 @@ export default async function AdminRecipesPage({ searchParams }: Props) {
   const recipes = all ?? []
   const drafts = recipes.filter((r: any) => !r.is_published)
   const published = recipes.filter((r: any) => r.is_published)
+  // Generator zapisuje pusty string, gdy zdjęcie się nie udało; ręcznie dodany
+  // przepis zostawia null — do eksportu łapiemy oba przypadki.
+  const bezZdjecia = recipes.filter((r: any) => !r.image_url)
 
   // Domyslnie pokazujemy szkice, a nie wszystko naraz. Opublikowane przepisy sa
   // gotowe i nie wymagaja juz uwagi - mieszanie ich z kolejka do akceptacji
@@ -43,10 +46,26 @@ export default async function AdminRecipesPage({ searchParams }: Props) {
         <h1 className="text-2xl font-bold text-stone-800" style={{ fontFamily: 'var(--font-serif)' }}>
           Przepisy
         </h1>
-        <Link href="/admin/przepisy/nowy" className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Nowy przepis
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Zwykły link z download — plik składa trasa serwerowa, więc nie potrzeba
+              tu ani stanu, ani JS-a po stronie klienta. */}
+          {bezZdjecia.length > 0 && (
+            <a
+              href="/api/eksport-bez-zdjec"
+              download
+              title="Pobierz listę przepisów bez zdjęcia wraz z gotowymi promptami"
+              className="inline-flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-xl border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 transition-colors"
+            >
+              <ImageOff className="w-4 h-4" />
+              Bez zdjęcia
+              <span className="text-xs text-stone-400">{bezZdjecia.length}</span>
+            </a>
+          )}
+          <Link href="/admin/przepisy/nowy" className="btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Nowy przepis
+          </Link>
+        </div>
       </div>
 
       {/* Filtr statusu — domyślnie kolejka szkiców do akceptacji */}
