@@ -169,8 +169,11 @@ export default async function RecipePage({ params }: Props) {
     recipeInstructions: normalized.steps.map((s: any) => ({ '@type': 'HowToStep', text: s.description })),
   }
 
-  const categoryChips = (light: boolean) =>
-    normalized.categories.map((cat: any) => (
+  // Na zdjęciu pokazujemy najwyżej trzy tagi. Przy pięciu wiersz zawijał się na dwa
+  // rzędy i cały blok — tagi plus trzylinijkowy tytuł — wypełniał na telefonie całą
+  // wysokość kadru, wchodząc pod plakietki przyklejone do górnej krawędzi.
+  const categoryChips = (light: boolean, limit?: number) =>
+    (limit ? normalized.categories.slice(0, limit) : normalized.categories).map((cat: any) => (
       <span
         key={cat.id}
         className={
@@ -209,14 +212,12 @@ export default async function RecipePage({ params }: Props) {
                 <span className="store-badge" style={{ backgroundColor: storeBg }}>{normalized.store.name}</span>
               )}
             </div>
-            {urgencyLabel && (
-              <div className="absolute top-4 right-4 bg-amber-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow">
-                🏷️ Promocja {urgencyLabel}
-              </div>
-            )}
+            {/* Plakietka promocji zeszła ze zdjęcia: ta sama informacja stoi niżej,
+                w dodatku z konkretną datą. Na zdjęciu tylko kolidowała z tagami,
+                bo obie rzeczy walczyły o ten sam pas przy górnej krawędzi. */}
             <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
-              <div className="flex flex-wrap gap-2 mb-3">{categoryChips(true)}</div>
-              <h1 className="text-white text-3xl sm:text-4xl font-bold leading-tight" style={{ fontFamily: 'var(--font-serif)' }}>
+              <div className="flex flex-wrap gap-2 mb-3">{categoryChips(true, 3)}</div>
+              <h1 className="text-white text-2xl sm:text-4xl font-bold leading-tight" style={{ fontFamily: 'var(--font-serif)' }}>
                 {normalized.title}
               </h1>
             </div>
