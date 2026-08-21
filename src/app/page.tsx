@@ -79,12 +79,12 @@ function SectionSkeleton({ height }: { height: number }) {
 // Karuzela klasyków. Moduł pojawia się dopiero, gdy uda się odtworzyć sensowną
 // liczbę popularnych dań — trzy przypadkowe pozycje pod takim nagłówkiem wyglądają
 // jak niedokończona strona, a nie jak wybór redakcji.
-async function PopularDishesSection() {
-  const recipes = await cachedPopularDishes()
+async function PopularDishesSection({ storeSlug, storeName }: { storeSlug?: string; storeName?: string }) {
+  const recipes = await cachedPopularDishes(storeSlug)
   if (recipes.length < MIN_POPULAR_DISHES) return null
   return (
     <RecipeCarousel
-      title="Klasyczne dania"
+      title={storeName ? `Klasyczne dania — ${storeName}` : 'Klasyczne dania'}
       recipes={recipes}
       icon={<ChefHat className="w-5 h-5 text-[#12b76a]" />}
     />
@@ -311,6 +311,19 @@ export default async function HomePage({ searchParams }: HomeProps) {
     params.maxPrice || params.airfryer || params.ending
   )
 
+  // Sam wybór sklepu nie unieważnia karuzeli klasyków — zawężamy ją do tego sklepu.
+  // Przy dwóch zaznaczonych sklepach odpuszczamy: „klasyki" musiałyby mieszać dwie
+  // gazetki i przestałyby być listą, po której da się zrobić jedne zakupy.
+  const wybraneSklepy = (params.store ?? '').split(',').filter(Boolean)
+  const tylkoSklep = Boolean(
+    params.store && wybraneSklepy.length === 1 &&
+    !params.category && !params.difficulty && !params.search &&
+    !params.maxPrice && !params.airfryer && !params.ending
+  )
+  const jedenSklep = tylkoSklep
+    ? (stores ?? []).find((s: any) => s.slug === wybraneSklepy[0])
+    : undefined
+
   return (
     <div>
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -329,10 +342,13 @@ export default async function HomePage({ searchParams }: HomeProps) {
             </div>
           </Suspense>
 
-          {/* Klasyki pod filtrami — moduł znika, gdy nie ma czego pokazać */}
-          {!filtered && (
+          {/* Klasyki pod filtrami — moduł znika, gdy nie ma czego pokazać.
+              Przy wybranym sklepie karuzela zostaje, tylko zawężona do niego:
+              „klasyki w Biedronce" to nadal sensowny wybór redakcji, a przy
+              filtrze kategorii czy ceny byłaby już zbiorem przypadkowym. */}
+          {(!filtered || tylkoSklep) && (
             <Suspense fallback={<CarouselSkeleton />}>
-              <PopularDishesSection />
+              <PopularDishesSection storeSlug={jedenSklep?.slug} storeName={jedenSklep?.name} />
             </Suspense>
           )}
 

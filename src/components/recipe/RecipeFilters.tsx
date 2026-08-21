@@ -226,6 +226,15 @@ export function RecipeFilters({ stores, categories }: FiltersProps) {
 
   const toggleStore = useCallback(
     (slug: string) => {
+      // Na telefonie jeden sklep naraz: pasek chipów ma tam własne przewijanie
+      // poziome, więc przy kilku zaznaczonych nie widać, co jest włączone,
+      // a karuzela klasyków nie ma jak zawęzić się do „dwóch gazetek naraz".
+      // Sprawdzamy szerokość przy kliknięciu — bez stanu i bez obsługi resize.
+      const telefon = typeof window !== 'undefined' && !window.matchMedia('(min-width: 768px)').matches
+      if (telefon) {
+        setParam('store', activeStores.has(slug) ? null : slug)
+        return
+      }
       const next = new Set(activeStores)
       if (next.has(slug)) next.delete(slug)
       else next.add(slug)

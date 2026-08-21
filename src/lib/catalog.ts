@@ -89,9 +89,10 @@ export const cachedStoreCounts = unstable_cache(
 export const MIN_POPULAR_DISHES = 4
 
 export const cachedPopularDishes = unstable_cache(
-  async (): Promise<any[]> => {
+  // Argument wchodzi do klucza cache, wiec kazdy sklep ma wlasny wpis
+  async (storeSlug?: string): Promise<any[]> => {
     const supabase = createPublicClient()
-    const { recipes } = await fetchRecipes(supabase, { sort: 'cheap', limit: 120 })
+    const { recipes } = await fetchRecipes(supabase, { sort: 'cheap', limit: 120, storeSlug })
 
     // Jeden przepis na danie. Piec schabowych obok siebie to nie karuzela klasykow,
     // tylko lista schabowych - a fetchRecipes sortuje po cenie, wiec pierwszy
