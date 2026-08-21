@@ -2,14 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeFilters } from '@/components/recipe/RecipeFilters'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
-import { FeaturedRecipe } from '@/components/recipe/FeaturedRecipe'
+import { PopularDishesCarousel } from '@/components/recipe/PopularDishesCarousel'
 import { FilterTransitionProvider, ResultsPending } from '@/components/recipe/FilterTransition'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { dedupeRecipes } from '@/lib/recipeDedupe'
 import { hasActivePromo, promoDaysLeft } from '@/lib/utils'
 import { savingsPercent, soonestPromoEnd } from '@/lib/savings'
 import { favoriteCounts } from '@/lib/favoriteCounts'
-import { cachedStores, cachedCategories, cachedCheapest, cachedEndingSoon, ENDING_SOON_DAYS } from '@/lib/catalog'
+import { cachedStores, cachedCategories, cachedCheapest, cachedEndingSoon, ENDING_SOON_DAYS, cachedPopularDishes, MIN_POPULAR_DISHES } from '@/lib/catalog'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { Flame, PiggyBank, Hourglass } from 'lucide-react'
 import Link from 'next/link'
@@ -52,15 +52,14 @@ function GridSkeleton() {
   )
 }
 
-function FeaturedSkeleton() {
+function CarouselSkeleton() {
   return (
-    <div className="mb-10 grid md:grid-cols-2 overflow-hidden rounded-3xl border border-stone-100 bg-white" aria-hidden="true">
-      <div className="aspect-[16/10] md:aspect-auto md:min-h-[340px] bg-stone-100 animate-pulse" />
-      <div className="p-6 md:p-9 space-y-4">
-        <div className="h-5 w-32 rounded-full bg-stone-100 animate-pulse" />
-        <div className="h-9 w-3/4 rounded bg-stone-100 animate-pulse" />
-        <div className="h-4 w-full rounded bg-stone-100 animate-pulse" />
-        <div className="h-12 w-40 rounded bg-stone-100 animate-pulse" />
+    <div className="mb-10" aria-hidden="true">
+      <div className="h-6 w-56 rounded bg-stone-100 animate-pulse mb-4" />
+      <div className="flex gap-5 overflow-hidden">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="shrink-0 w-[17rem] sm:w-[19rem] rounded-2xl bg-stone-50 animate-pulse h-[22rem]" />
+        ))}
       </div>
     </div>
   )
@@ -77,22 +76,23 @@ function SectionSkeleton({ height }: { height: number }) {
 }
 
 
-// Afisz i „Najtańsze” dzielą jedno cache'owane zapytanie.
-async function pickFeatured() {
-  const all = await cachedCheapest()
-  return all.find((r: any) => r.image_url) ?? all[0] ?? null
-}
-
-async function FeaturedSection() {
-  const recipe = await pickFeatured()
-  if (!recipe) return null
-  return <FeaturedRecipe recipe={recipe} />
+// Karuzela klasyków. Moduł pojawia się dopiero, gdy uda się odtworzyć sensowną
+// liczbę popularnych dań — trzy przypadkowe pozycje pod takim nagłówkiem wyglądają
+// jak niedokończona strona, a nie jak wybór redakcji.
+async function PopularDishesSection() {
+  const recipes = await cachedPopularDishes()
+  if (recipes.length < MIN_POPULAR_DISHES) return null
+  return <PopularDishesCarousel recipes={recipes} />
 }
 
 async function CheapestSection() {
-  const [all, featured] = await Promise.all([cachedCheapest(), pickFeatured()])
-  // Bez powtórki przepisu, który wisi już na afiszu wyżej
-  const recipes = all.filter((r: any) => r.id !== featured?.id).slice(0, 6)
+  const [all, popular] = await Promise.all([cachedCheapest(), cachedPopularDishes()])
+  // Bez powtórek tego, co stoi już w karuzelI wyżej — ale tylko wtedy, gdy karuzela
+  // faktycznie się renderuje. Poniżej progu jest ukryta, więc nie ma czego odejmować.
+  const wKaruzeli = new Set(
+    popular.length >= MIN_POPULAR_DISHES ? popular.map((r: any) => r.id) : []
+  )
+  const recipes = all.filter((r: any) => !wKaruzeli.has(r.id)).slice(0, 6)
   if (recipes.length === 0) return null
   return (
     <section className="mb-10">
@@ -297,7 +297,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
   // Sklepy i kategorie nie zależą od filtrów — lecą z cache, nie z bazy przy każdym kliknięciu
   const [stores, categories] = await Promise.all([cachedStores(), cachedCategories()])
 
-  // Po zawężeniu wyników sekcje polecane („Przepis tygodnia", „Ostatnia szansa",
+  // Po zawężeniu wyników sekcje polecane („Najpopularniejsze dania", „Ostatnia szansa",
   // „Najtańsze") ignorowałyby filtr i mieszały do wyników przepisy, których
   // użytkownik właśnie nie chciał. Przy aktywnym filtrze pokazujemy samą siatkę.
   const filtered = Boolean(
@@ -329,10 +329,10 @@ export default async function HomePage({ searchParams }: HomeProps) {
             </div>
           </Suspense>
 
-          {/* Przepis tygodnia pod filtrami */}
+          {/* Klasyki pod filtrami — moduł znika, gdy nie ma czego pokazać */}
           {!filtered && (
-            <Suspense fallback={<FeaturedSkeleton />}>
-              <FeaturedSection />
+            <Suspense fallback={<CarouselSkeleton />}>
+              <PopularDishesSection />
             </Suspense>
           )}
 

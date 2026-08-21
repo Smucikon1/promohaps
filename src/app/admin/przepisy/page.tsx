@@ -20,14 +20,17 @@ export default async function AdminRecipesPage({ searchParams }: Props) {
   const drafts = recipes.filter((r: any) => !r.is_published)
   const published = recipes.filter((r: any) => r.is_published)
 
-  const view = status === 'draft' ? drafts : status === 'published' ? published : recipes
+  // Domyslnie pokazujemy szkice, a nie wszystko naraz. Opublikowane przepisy sa
+  // gotowe i nie wymagaja juz uwagi - mieszanie ich z kolejka do akceptacji
+  // sprawialo, ze przy kilkudziesieciu pozycjach nie bylo widac, co zostalo do zrobienia.
+  const view = status === 'all' ? recipes : status === 'published' ? published : drafts
 
   const tabs = [
-    { key: '', label: 'Wszystkie', count: recipes.length, href: '/admin/przepisy' },
-    { key: 'draft', label: 'Szkice', count: drafts.length, href: '/admin/przepisy?status=draft' },
+    { key: 'draft', label: 'Szkice', count: drafts.length, href: '/admin/przepisy' },
     { key: 'published', label: 'Opublikowane', count: published.length, href: '/admin/przepisy?status=published' },
+    { key: 'all', label: 'Wszystkie', count: recipes.length, href: '/admin/przepisy?status=all' },
   ]
-  const activeKey = status === 'draft' ? 'draft' : status === 'published' ? 'published' : ''
+  const activeKey = status === 'all' ? 'all' : status === 'published' ? 'published' : 'draft'
 
   return (
     <div>
@@ -46,7 +49,7 @@ export default async function AdminRecipesPage({ searchParams }: Props) {
         </Link>
       </div>
 
-      {/* Filtr statusu — kolejka szkiców do akceptacji */}
+      {/* Filtr statusu — domyślnie kolejka szkiców do akceptacji */}
       <div className="flex gap-2 mb-6">
         {tabs.map((t) => (
           <Link
@@ -70,7 +73,11 @@ export default async function AdminRecipesPage({ searchParams }: Props) {
           <div className="text-center py-16">
             <div className="text-4xl mb-3">📭</div>
             <p className="text-stone-500">
-              {activeKey === 'draft' ? 'Brak szkiców do akceptacji.' : 'Brak przepisów.'}
+              {activeKey === 'draft'
+                ? 'Brak szkiców do akceptacji — wszystko opublikowane.'
+                : activeKey === 'published'
+                  ? 'Nie opublikowano jeszcze żadnego przepisu.'
+                  : 'Brak przepisów.'}
             </p>
           </div>
         </div>

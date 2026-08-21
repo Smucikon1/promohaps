@@ -2,6 +2,14 @@
 import Anthropic from '@anthropic-ai/sdk'
 // Ten sam próg wiarygodności ceny, co przy liczeniu oszczędności na stronie
 import { MIN_PLAUSIBLE_PRICE } from '@/lib/savings'
+import {
+  normalizePl as normalize,
+  currentSeasonKey,
+  pickPopularDish,
+  findDuplicateTitle,
+  type SeasonKey,
+  type PopularPick,
+} from '@/lib/popularDishes'
 
 // Obietnica serwisu: tanio i prosto. Przepis łamiący którykolwiek limit jest
 // odrzucany zamiast publikowany — admin generuje ponownie (koszt jednego wywołania).
@@ -31,13 +39,6 @@ const PANTRY_PHRASES = [
   'papryka slodka', 'papryka mielona', 'papryka wedzona', 'papryka ostra',
   'proszek do pieczenia', 'ziola prowansalskie',
 ]
-
-// Ujednolica polskie znaki, żeby „sól" i „sol" trafiały w ten sam wzorzec
-function normalize(s: string): string {
-  return s.toLowerCase()
-    .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l')
-    .replace(/ń/g, 'n').replace(/ó/g, 'o').replace(/ś/g, 's').replace(/ż|ź/g, 'z')
-}
 
 function isPantryStaple(name: string): boolean {
   const n = normalize(name)
@@ -88,8 +89,6 @@ const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)]
 // Przepis powstaje dziś i dziś trafia do gazetki, więc ma pasować do pory roku.
 // Grzane rosoły w lipcu i zimne sałatki w styczniu odrzucają czytelnika,
 // a poza tym sezonowe warzywa są wtedy najtańsze — czyli zgodne z sensem serwisu.
-type SeasonKey = 'zima' | 'wiosna' | 'lato' | 'jesien'
-
 const SEASONS: Record<SeasonKey, { pora: string; opis: string }> = {
   zima: {
     pora: 'zima',
@@ -109,173 +108,8 @@ const SEASONS: Record<SeasonKey, { pora: string; opis: string }> = {
   },
 }
 
-function currentSeasonKey(now = new Date()): SeasonKey {
-  const m = now.getMonth() + 1
-  if (m === 12 || m <= 2) return 'zima'
-  if (m <= 5) return 'wiosna'
-  if (m <= 8) return 'lato'
-  return 'jesien'
-}
-
 function currentSeason(now = new Date()) {
   return SEASONS[currentSeasonKey(now)]
-}
-
-// ---------- Najpopularniejsze dania ----------
-
-// Ludzie wyszukują „kotlet schabowy" i „gołąbki", nie „tagine z ciecierzycą".
-// Przewagą serwisu nad porównywarkami cen są przepisy, więc katalog musi trafiać
-// w realne zapytania. Ale popularne danie ma sens tylko wtedy, gdy w tym tygodniu
-// wychodzi tanio — a to wiadomo z góry po tym, czy jego trzon jest w gazetce.
-interface PopularDish {
-  nazwa: string
-  /** Jak chętnie gotuje się to danie w polskich domach — ranking popularności.
-   *  5 = kanon obecny w większości domów (schabowy, rosół, pomidorowa),
-   *  1 = danie okazjonalne, robione raz na jakiś czas.
-   *  Waży dobór: gdy do gazetki pasuje kilka dań, pierwszeństwo ma częściej gotowane. */
-  ranga: 1 | 2 | 3 | 4 | 5
-  /** Fragmenty nazw produktów (bez polskich znaków) — po nich poznajemy trzon dania
-   *  w gazetce. Celowo długie: samo „ser" złapałoby deser, a samo „maka" — makaron. */
-  core: string[]
-  /** Pory roku, do których danie pasuje. Brak = cały rok. */
-  sezon?: SeasonKey[]
-}
-
-const POPULAR_DISHES: PopularDish[] = [
-  // --- ranga 5: kanon, gotowany w większości polskich domów ---
-  { nazwa: 'kotlet schabowy', ranga: 5, core: ['schab'] },
-  { nazwa: 'kotlety mielone', ranga: 5, core: ['mieso mielon', 'mielone wieprz', 'mielone wolow'] },
-  { nazwa: 'spaghetti bolognese', ranga: 5, core: ['mieso mielon', 'mielone wieprz', 'passat', 'makaron'] },
-  { nazwa: 'zupa pomidorowa', ranga: 5, core: ['passat', 'koncentrat pomidor', 'pomidory w puszce'] },
-  { nazwa: 'nalesniki z serem', ranga: 5, core: ['twarog', 'mleko', 'jajk'] },
-  { nazwa: 'rosol', ranga: 5, core: ['kurcz', 'wloszczyzn', 'porcja rosolow'], sezon: ['jesien', 'zima', 'wiosna'] },
-
-  // --- ranga 4: bardzo częste, tydzień w tydzień ---
-  { nazwa: 'placki ziemniaczane', ranga: 4, core: ['ziemniak'] },
-  { nazwa: 'pierogi ruskie', ranga: 4, core: ['twarog', 'ziemniak'] },
-  { nazwa: 'udka pieczone', ranga: 4, core: ['udk', 'podudz', 'cwiartk'] },
-  { nazwa: 'kurczak pieczony w sosie', ranga: 4, core: ['kurcz', 'filet z kurcz'] },
-  { nazwa: 'kotlet z piersi kurczaka', ranga: 4, core: ['filet z kurcz', 'piers z kurcz'] },
-  { nazwa: 'klopsiki w sosie pomidorowym', ranga: 4, core: ['mieso mielon', 'mielone wieprz', 'passat', 'koncentrat pomidor'] },
-  { nazwa: 'zupa ogorkowa', ranga: 4, core: ['ogorki kiszon', 'ogorek kiszon'] },
-  { nazwa: 'golabki', ranga: 4, core: ['mieso mielon', 'mielone wieprz', 'kapust', 'ryz'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'bigos', ranga: 4, core: ['kapusta kiszon', 'kielbas'], sezon: ['jesien', 'zima'] },
-
-  // --- ranga 3: solidna klasyka, ale rzadziej niż powyższe ---
-  { nazwa: 'schab pieczony', ranga: 3, core: ['schab'] },
-  { nazwa: 'kopytka', ranga: 3, core: ['ziemniak', 'maka ziemniacz'] },
-  { nazwa: 'kluski slaskie', ranga: 3, core: ['ziemniak', 'maka ziemniacz'] },
-  { nazwa: 'potrawka z kurczaka z ryzem', ranga: 3, core: ['kurcz', 'filet z kurcz', 'ryz'] },
-  { nazwa: 'makaron w sosie serowym', ranga: 3, core: ['makaron', 'ser zolty', 'serek'] },
-  { nazwa: 'zupa pieczarkowa', ranga: 3, core: ['pieczark'] },
-  { nazwa: 'salatka jarzynowa', ranga: 3, core: ['marchew', 'majonez', 'wloszczyzn'] },
-  { nazwa: 'fasolka po bretonsku', ranga: 3, core: ['fasol', 'kielbas'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'gulasz wieprzowy', ranga: 3, core: ['lopatk', 'kark', 'wolow'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'barszcz czerwony', ranga: 3, core: ['burak'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'krupnik', ranga: 3, core: ['kasza', 'wloszczyzn'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'zurek', ranga: 3, core: ['zurek', 'kielbas', 'jajk'], sezon: ['wiosna', 'jesien', 'zima'] },
-  { nazwa: 'leczo', ranga: 3, core: ['papryk', 'cukini', 'kielbas'], sezon: ['lato', 'jesien'] },
-  { nazwa: 'racuchy z jablkami', ranga: 3, core: ['jablk', 'maka pszen'], sezon: ['lato', 'jesien'] },
-  { nazwa: 'makaron z truskawkami', ranga: 3, core: ['truskaw', 'makaron'], sezon: ['lato'] },
-
-  // --- ranga 2: robione od święta albo mocno sezonowo ---
-  { nazwa: 'zapiekanka ziemniaczana', ranga: 2, core: ['ziemniak', 'ser zolty', 'kielbas'], sezon: ['jesien', 'zima'] },
-  { nazwa: 'zapiekanka z pieczarkami', ranga: 2, core: ['pieczark', 'bagietk', 'ser zolty'] },
-  { nazwa: 'ryba po grecku', ranga: 2, core: ['mintaj', 'mirun', 'dorsz'] },
-  { nazwa: 'chlodnik', ranga: 2, core: ['botwin', 'burak', 'kefir'], sezon: ['lato'] },
-  { nazwa: 'salatka grecka', ranga: 2, core: ['pomidor', 'ogorek', 'ogorki', 'feta'], sezon: ['lato'] },
-]
-
-// Nie zawsze klasyk: przy 100% katalog skurczyłby się do tych kilkudziesięciu pozycji
-// i zaczął się powtarzać. Reszta idzie starą ścieżką (losowa kuchnia + technika).
-const POPULAR_SHARE = 0.7
-
-export interface PopularPick {
-  nazwa: string
-  /** Pozycja w rankingu popularności (5 = kanon) — do wglądu przy diagnostyce doboru */
-  ranga: number
-  /** Produkty z gazetki, które czynią to danie tanim — model ma na nich oprzeć przepis */
-  matched: string[]
-}
-
-// Czy tytuł istniejącego przepisu to już to danie. Heurystyka: wszystkie znaczące
-// słowa nazwy (przycięte do 5 znaków, bo polski odmienia końcówki) muszą wystąpić
-// w tytule. Dubluje instrukcję „unikaj_tytulow" wysyłaną do modelu — tu chodzi tylko
-// o to, żeby nie proponować mu dania, które i tak odrzuci.
-const STOPWORDS = new Set(['z', 'w', 'po', 'na', 'do', 'i', 'ze'])
-
-function alreadyCovered(dish: PopularDish, avoidTitles: string[]): boolean {
-  const words = normalize(dish.nazwa)
-    .split(/\s+/)
-    .filter((w) => w.length > 1 && !STOPWORDS.has(w))
-    .map((w) => w.slice(0, 5))
-  if (words.length === 0) return false
-  return avoidTitles.some((t) => {
-    const n = normalize(t)
-    return words.every((w) => n.includes(w))
-  })
-}
-
-/**
- * Wybiera popularne danie, które w tym tygodniu wyjdzie tanio.
- *
- * Bramka cenowa siedzi w doborze, nie w odrzucaniu gotowego przepisu: schabowy jest
- * tani wtedy, gdy schab jest w gazetce. Gdy go nie ma — po prostu nie proponujemy
- * schabowego, zamiast generować go i wyrzucać (co kosztowałoby kolejne wywołanie API,
- * a Vercel Hobby daje 60 s na całą trasę).
- *
- * Zwraca null, gdy nic nie pasuje albo gdy wypadła „reszta" — wtedy generator wraca
- * do losowej ścieżki CUISINES/TECHNIQUES/MEALS.
- */
-export function pickPopularDish(
-  promoProducts: any[] = [],
-  avoidTitles: string[] = [],
-  now = new Date()
-): PopularPick | null {
-  if (Math.random() > POPULAR_SHARE) return null
-
-  const season = currentSeasonKey(now)
-  const names = (promoProducts ?? [])
-    .map((p) => normalize(String(p?.name ?? '')))
-    .filter(Boolean)
-  if (names.length === 0) return null
-
-  const scored = POPULAR_DISHES
-    .filter((d) => !d.sezon || d.sezon.includes(season))
-    .filter((d) => !alreadyCovered(d, avoidTitles))
-    .map((d) => ({
-      dish: d,
-      matched: names.filter((n) => d.core.some((c) => n.includes(c))),
-      // Liczymy trafione TRZONY, nie produkty: pięć rodzajów makaronu w gazetce
-      // nie czyni spaghetti tańszym niż jeden makaron plus jedna passata.
-      hits: d.core.filter((c) => names.some((n) => n.includes(c))).length,
-    }))
-    .filter((x) => x.hits > 0)
-
-  if (scored.length === 0) return null
-
-  // Waga = ranga w rankingu × liczba trafionych trzonów. Oba czynniki muszą zagrać:
-  // danie ma być i chętnie gotowane w polskich domach, i tanie w tym konkretnym tygodniu.
-  // Schabowy (ranga 5) przy jednym trafieniu waży 5, spaghetti (ranga 5) przy trzech — 15,
-  // a chłodnik (ranga 2) przy trzech tylko 6. Nisza musi mieć mocne pokrycie w gazetce,
-  // żeby wygrać z kanonem, a kanon bez promocji i tak nie wejdzie (hits > 0 to warunek).
-  const waga = (x: (typeof scored)[number]) => x.dish.ranga * x.hits
-  const total = scored.reduce((s, x) => s + waga(x), 0)
-  let roll = Math.random() * total
-  let chosen = scored[scored.length - 1]
-  for (const x of scored) {
-    roll -= waga(x)
-    if (roll <= 0) {
-      chosen = x
-      break
-    }
-  }
-
-  return {
-    nazwa: chosen.dish.nazwa,
-    ranga: chosen.dish.ranga,
-    matched: [...new Set(chosen.matched)].slice(0, 8),
-  }
 }
 
 function popularTheme(pick: PopularPick): string {
@@ -501,6 +335,10 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     )
     if (sum > 0) recipe.price_total = Math.round(sum * 100) / 100
 
+    // Model dostaje listę „unikaj_tytulow", ale bywa, że i tak zwraca wariant tego,
+    // co już jest w katalogu tego sklepu („Schabowy z ziemniakami" przy istniejącym
+    // „Kotlet schabowy z młodymi ziemniakami"). Instrukcja to za mało — sprawdzamy sami.
+    const duplicate = findDuplicateTitle(recipe.title ?? '', avoidTitles)
     const overBudget = recipe.price_total > MAX_RECIPE_PRICE
     const tooManyIngredients = (recipe.ingredients ?? []).length > MAX_INGREDIENTS
     // Bez ceny może zostać wyłącznie sól/pieprz/olej itp. Inaczej rachunek pokazany
@@ -509,9 +347,10 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
       .filter((i: any) => typeof i?.price !== 'number' && i?.name && !isPantryStaple(i.name))
       .map((i: any) => i.name)
 
-    if (!overBudget && !tooManyIngredients && unpricedNonStaples.length === 0) return recipe
+    if (!overBudget && !tooManyIngredients && unpricedNonStaples.length === 0 && !duplicate) return recipe
 
     const problems = [
+      duplicate ? `ten przepis powiela istniejący już w tym sklepie: „${duplicate}"` : '',
       overBudget ? `suma wyszła ${recipe.price_total.toFixed(2)} zł (limit ${MAX_RECIPE_PRICE} zł)` : '',
       tooManyIngredients ? `użyto ${recipe.ingredients.length} składników (limit ${MAX_INGREDIENTS})` : '',
       unpricedNonStaples.length
@@ -519,7 +358,13 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
         : '',
     ].filter(Boolean).join(' oraz ')
 
-    if (attempt === 1) throw new Error(`Nie udało się zmieścić w limitach: ${problems}. Spróbuj ponownie.`)
+    if (attempt === 1) {
+      throw new Error(
+        duplicate
+          ? `Model dwukrotnie zwrócił przepis powielający istniejący („${duplicate}"). Spróbuj ponownie albo podaj temat.`
+          : `Nie udało się zmieścić w limitach: ${problems}. Spróbuj ponownie.`
+      )
+    }
 
     // Druga próba: model widzi własny wynik i wie dokładnie, co poprawić
     messages.push({ role: 'assistant', content: raw })
@@ -527,6 +372,10 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
       role: 'user',
       content:
         `Ten przepis łamie limity serwisu: ${problems}. ` +
+        (duplicate
+          ? 'DUPLIKAT jest tu najważniejszy: zrób INNE danie, nie wariant tego samego. ' +
+            'Zmiana szyku słów w tytule ani dodanie dodatku to nadal ten sam przepis. '
+          : '') +
         'Przerób go: tańsze białko, mniej pozycji spoza gazetki, mniejsze opakowania. ' +
         'NIE zaniżaj cen — zmień składniki. ' +
         'Jeśli TEGO KONKRETNEGO dania nie da się zmieścić w budżecie nawet po uproszczeniu, ' +

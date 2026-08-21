@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { generateRecipeJson } from '@/lib/ai'
 import { generateRecipeImage } from '@/lib/recipeImage'
 import { checkLimit } from '@/lib/rateLimit'
+import { fetchStoreTitles } from '@/lib/recipeTitles'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -22,12 +23,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Nieprawidłowe dane.' }, { status: 400 })
   }
 
-  const [{ data: stores }, { data: categories }, { data: existing }] = await Promise.all([
+  const [{ data: stores }, { data: categories }] = await Promise.all([
     supabase.from('stores').select('id, slug, name').eq('is_active', true),
     supabase.from('categories').select('id, slug').eq('is_active', true),
-    // Tytuły ostatnich przepisów — model ma ich nie powtarzać
-    supabase.from('recipes').select('title').order('created_at', { ascending: false }).limit(40),
   ])
+
+  // Tytuły z TEGO sklepu — model ma ich nie powtarzać, a generator sprawdza to twardo.
+  // Sklep musi być znany przed generowaniem, żeby lista „unikaj" była właściwa.
+  const targetStore = (stores ?? []).find((s: any) => s.slug === body.storeSlug)
+  const existingTitles = await fetchStoreTitles(supabase, targetStore?.id)
 
   let recipe: any
   try {
@@ -37,7 +41,7 @@ export async function POST(request: Request) {
       theme: (body.theme ?? '').toString().slice(0, 300),
       categorySlugs: (categories ?? []).map((c: any) => c.slug),
       promoProducts: Array.isArray(body.promoProducts) ? body.promoProducts : [],
-      avoidTitles: (existing ?? []).map((r: any) => r.title).filter(Boolean),
+      avoidTitles: existingTitles,
       reuseProducts: Array.isArray(body.reuseProducts) ? body.reuseProducts : [],
     })
   } catch (e: any) {

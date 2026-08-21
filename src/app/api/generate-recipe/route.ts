@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateRecipeJson } from '@/lib/ai'
 import { checkLimit } from '@/lib/rateLimit'
+import { fetchStoreTitles } from '@/lib/recipeTitles'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -21,6 +22,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Nieprawidłowe dane.' }, { status: 400 })
   }
 
+  // Bez tego pojedyncze generowanie w adminie nie sprawdzało powtórek w ogóle
+  const { data: store } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('slug', body.storeSlug ?? '')
+    .maybeSingle()
+  const avoidTitles = await fetchStoreTitles(supabase, store?.id)
+
   try {
     const recipe = await generateRecipeJson({
       storeSlug: body.storeSlug ?? '',
@@ -28,6 +37,7 @@ export async function POST(request: Request) {
       theme: (body.theme ?? '').toString().slice(0, 300),
       categorySlugs: Array.isArray(body.categorySlugs) ? body.categorySlugs : [],
       promoProducts: Array.isArray(body.promoProducts) ? body.promoProducts : [],
+      avoidTitles,
     })
     return NextResponse.json({ recipe })
   } catch (e: any) {

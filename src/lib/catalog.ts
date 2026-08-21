@@ -4,6 +4,7 @@ import { fetchRecipes } from '@/lib/recipeQuery'
 import { expiredRecipeIds, CATALOG_TAG } from '@/lib/promoVisibility'
 import { soonestPromoEnd } from '@/lib/savings'
 import { promoDaysLeft } from '@/lib/utils'
+import { dishOfTitle } from '@/lib/popularDishes'
 import type { Store, Category } from '@/types'
 
 // Dane, które NIE zależą od filtrów: sklepy, kategorie, przepis na afiszu,
@@ -77,5 +78,36 @@ export const cachedStoreCounts = unstable_cache(
     return Array.from(counts.entries())
   },
   ['katalog-liczniki'],
+  OPTS
+)
+
+// Karuzela klasykow na stronie glownej.
+// Pokazujemy tylko te z najpopularniejszych polskich dan, ktore realnie udalo sie
+// odtworzyc z gazetek. Ponizej progu modul sie nie renderuje - trzy przypadkowe
+// pozycje pod naglowkiem "Najpopularniejsze dania" wygladaja jak bledna strona,
+// a nie jak wybor redakcji.
+export const MIN_POPULAR_DISHES = 4
+
+export const cachedPopularDishes = unstable_cache(
+  async (): Promise<any[]> => {
+    const supabase = createPublicClient()
+    const { recipes } = await fetchRecipes(supabase, { sort: 'cheap', limit: 120 })
+
+    // Jeden przepis na danie. Piec schabowych obok siebie to nie karuzela klasykow,
+    // tylko lista schabowych - a fetchRecipes sortuje po cenie, wiec pierwszy
+    // napotkany wariant kazdego dania jest zarazem najtanszy.
+    const best = new Map<string, { recipe: any; ranga: number }>()
+    for (const r of recipes) {
+      const dish = dishOfTitle(r.title ?? '')
+      if (!dish || best.has(dish.nazwa)) continue
+      best.set(dish.nazwa, { recipe: r, ranga: dish.ranga })
+    }
+
+    return [...best.values()]
+      .sort((a, b) => b.ranga - a.ranga)
+      .slice(0, 12)
+      .map((x) => x.recipe)
+  },
+  ['katalog-popularne-dania'],
   OPTS
 )
