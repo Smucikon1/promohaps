@@ -57,6 +57,12 @@ export function Header() {
           <span className="text-[#161918]">Gazetki</span>
         </Link>
 
+        {/* Zeszło tu z hero na stronie głównej. Na telefonie chowamy — przy wąskim
+            pasku wypychało ikony koszyka poza ekran. */}
+        <span className="hidden sm:inline ml-3 text-[11px] font-semibold uppercase tracking-wider text-stone-400 whitespace-nowrap">
+          Przepisy gazetkowe
+        </span>
+
         {/* ml-auto dosuwa nawigację do prawej, obok ikon. Bez tego justify-between
             rozrzucał trzy elementy równomiernie i link lądował na środku paska. */}
         <nav className="hidden md:flex items-center gap-6 ml-auto mr-5 text-sm font-medium text-stone-600">

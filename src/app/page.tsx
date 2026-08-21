@@ -11,7 +11,7 @@ import { savingsPercent, soonestPromoEnd } from '@/lib/savings'
 import { favoriteCounts } from '@/lib/favoriteCounts'
 import { cachedStores, cachedCategories, cachedCheapest, cachedEndingSoon, ENDING_SOON_DAYS, cachedPopularDishes, MIN_POPULAR_DISHES } from '@/lib/catalog'
 import { AdSlot } from '@/components/ads/AdSlot'
-import { Flame, PiggyBank, Hourglass } from 'lucide-react'
+import { Flame, Hourglass } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Store, Category } from '@/types'
@@ -308,16 +308,10 @@ export default async function HomePage({ searchParams }: HomeProps) {
   return (
     <div>
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Hero: badge + nagłówek. Logo zGazetki jest już w topbarze (Header). */}
-        <header className="relative mb-6 px-1 py-5 md:py-8">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e6f9f0] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#12b76a]">
-            <PiggyBank className="w-3.5 h-3.5" />
-            Przepisy gazetkowe
-          </span>
-          <h1 className="mt-3 text-2xl font-bold leading-tight text-stone-900 md:text-4xl md:max-w-3xl" style={{ fontFamily: 'var(--font-serif)' }}>
-            Oszczędzaj, gotując <span className="text-[#12b76a]">z gazetek promocyjnych</span>
-          </h1>
-        </header>
+        {/* Nagłówek zszedł z ekranu na rzecz miejsca na przepisy, ale h1 zostaje
+            dla wyszukiwarek i czytników ekranu — sr-only nie zajmuje ani piksela.
+            Strona bez h1 traci w Google, a to jedyne źródło ruchu tego serwisu. */}
+        <h1 className="sr-only">Przepisy z gazetek promocyjnych — tanie obiady z aktualnych promocji</h1>
 
         {/* Filtry i wyniki dzielą jeden stan przejścia: klik od razu przygasza
             siatkę i pokazuje spinner, zamiast zostawiać stronę bez reakcji. */}

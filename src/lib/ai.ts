@@ -46,6 +46,38 @@ function isPantryStaple(name: string): boolean {
   return n.split(/[^a-z0-9]+/).some((w) => PANTRY_WORDS.has(w))
 }
 
+// Ceny, poniżej których pozycja to na pewno cena ZA SZTUKĘ, a nie za opakowanie.
+// Model trzyma się reguły całych opakowań wszędzie poza produktami liczonymi na sztuki:
+// „2 jajka" mapuje mu się odruchowo na 0,70 zł za jajko, choć w sklepie kupuje się
+// dziesiątkę. Sama instrukcja w prompcie tego nie załatwia — stąd twarda kontrola.
+const MIN_OPAKOWANIE: { wzorzec: RegExp; min: number; opak: string }[] = [
+  { wzorzec: /\bjajk|\bjaja\b|\bjaj\b/i, min: 5, opak: 'opakowanie 10 sztuk' },
+  { wzorzec: /\bmasl|\bmasł/i, min: 4.5, opak: 'kostka 200 g' },
+  { wzorzec: /\bser\s|\bsera\b|gouda|edamsk|mozzarell/i, min: 4, opak: 'opakowanie ok. 250 g' },
+  { wzorzec: /twarog|twaróg/i, min: 3, opak: 'kostka 250 g' },
+  { wzorzec: /smietan|śmietan/i, min: 2, opak: 'kubek 400 g' },
+  { wzorzec: /\bmleko\b|\bmleka\b/i, min: 2.5, opak: 'karton 1 l' },
+  { wzorzec: /jogurt|kefir|maslank|maślank/i, min: 1.8, opak: 'opakowanie' },
+  { wzorzec: /makaron/i, min: 2.5, opak: 'paczka 400–500 g' },
+  { wzorzec: /\bryz\b|\bryż\b|\bryzu\b|\bryżu\b/i, min: 3, opak: 'paczka 1 kg' },
+  { wzorzec: /\bkasza|\bkaszy\b/i, min: 2.5, opak: 'paczka 400 g' },
+  { wzorzec: /passat|koncentrat pomidor|pomidory z puszki|pomidory w puszce/i, min: 2, opak: 'opakowanie' },
+  { wzorzec: /kielbas|kiełbas/i, min: 5, opak: 'opakowanie' },
+  { wzorzec: /bulk[aię]|bułk/i, min: 1.5, opak: 'opakowanie' },
+]
+
+/** Pozycje wycenione poniżej realnej ceny opakowania — czyli policzone „za sztukę" */
+function cenyZaSztuke(ingredients: any[]): string[] {
+  return (ingredients ?? [])
+    .filter((i) => i?.name && typeof i.price === 'number' && i.price > 0)
+    .map((i) => {
+      const trafienie = MIN_OPAKOWANIE.find((m) => m.wzorzec.test(String(i.name)))
+      if (!trafienie || i.price >= trafienie.min) return null
+      return `${i.name} za ${i.price.toFixed(2)} zł (to cena za sztukę — ${trafienie.opak} kosztuje co najmniej ${trafienie.min.toFixed(2)} zł)`
+    })
+    .filter(Boolean) as string[]
+}
+
 function client() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('Brak ANTHROPIC_API_KEY w konfiguracji serwera.')
@@ -201,6 +233,9 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     'Dlatego price KAŻDEGO składnika = cena CAŁEGO OPAKOWANIA ze sklepowej półki.',
     '  Przykład: przepis używa 200 g twarogu, ale w sklepie leży kostka 250 g za 4,99 zł',
     '  → price = 4.99 (cena kostki), NIE 3,99 za „200 g". Reszta zostaje w lodówce, ale zapłacone jest 4,99.',
+    '  DRUGI PRZYKŁAD, najczęstszy błąd: przepis używa 2 jajek, ale w sklepie leży',
+    '  wytłaczanka 10 sztuk za 8,99 zł → price = 8.99, NIE 1,80 za „2 jajka" i NIE 0,70 za sztukę.',
+    '  Tak samo masło, ser, śmietana, makaron, ryż — zawsze cena całego opakowania z półki.',
     'Nigdy nie licz cen „za zużytą część", „za sztukę z opakowania" ani proporcjonalnie do gramatury.',
     'amount/unit opisuj tak, jak produkt leży na półce (np. „500 g", „1 opakowanie", „6 sztuk"),',
     '  żeby użytkownik mógł porównać cenę z etykietą w sklepie.',
@@ -339,6 +374,7 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     // co już jest w katalogu tego sklepu („Schabowy z ziemniakami" przy istniejącym
     // „Kotlet schabowy z młodymi ziemniakami"). Instrukcja to za mało — sprawdzamy sami.
     const duplicate = findDuplicateTitle(recipe.title ?? '', avoidTitles)
+    const zaSztuke = cenyZaSztuke(recipe.ingredients ?? [])
     const overBudget = recipe.price_total > MAX_RECIPE_PRICE
     const tooManyIngredients = (recipe.ingredients ?? []).length > MAX_INGREDIENTS
     // Bez ceny może zostać wyłącznie sól/pieprz/olej itp. Inaczej rachunek pokazany
@@ -347,10 +383,11 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
       .filter((i: any) => typeof i?.price !== 'number' && i?.name && !isPantryStaple(i.name))
       .map((i: any) => i.name)
 
-    if (!overBudget && !tooManyIngredients && unpricedNonStaples.length === 0 && !duplicate) return recipe
+    if (!overBudget && !tooManyIngredients && unpricedNonStaples.length === 0 && !duplicate && zaSztuke.length === 0) return recipe
 
     const problems = [
       duplicate ? `ten przepis powiela istniejący już w tym sklepie: „${duplicate}"` : '',
+      zaSztuke.length ? `ceny policzone za sztukę zamiast za opakowanie: ${zaSztuke.join('; ')}` : '',
       overBudget ? `suma wyszła ${recipe.price_total.toFixed(2)} zł (limit ${MAX_RECIPE_PRICE} zł)` : '',
       tooManyIngredients ? `użyto ${recipe.ingredients.length} składników (limit ${MAX_INGREDIENTS})` : '',
       unpricedNonStaples.length
@@ -375,6 +412,11 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
         (duplicate
           ? 'DUPLIKAT jest tu najważniejszy: zrób INNE danie, nie wariant tego samego. ' +
             'Zmiana szyku słów w tytule ani dodanie dodatku to nadal ten sam przepis. '
+          : '') +
+        (zaSztuke.length
+          ? 'Ceny za sztukę popraw na ceny CAŁYCH OPAKOWAŃ z półki — użytkownik nie ma tych ' +
+            'produktów w domu i musi kupić całe opakowanie. Podnieś te ceny, a jeśli przez to ' +
+            'przekroczysz budżet, uprość danie zamiast zaniżać ceny. '
           : '') +
         'Przerób go: tańsze białko, mniej pozycji spoza gazetki, mniejsze opakowania. ' +
         'NIE zaniżaj cen — zmień składniki. ' +

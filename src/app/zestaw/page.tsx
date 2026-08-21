@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { PiggyBank, Recycle, Users, ShoppingBasket, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { dedupeRecipes } from '@/lib/recipeDedupe'
 import { hasActivePromo, formatPrice } from '@/lib/utils'
 import { buildWeeklySet, type SetRecipe } from '@/lib/weeklySet'
-import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { AddSetToList } from '@/components/recipe/AddSetToList'
 import { StoreLogo } from '@/components/recipe/StoreLogo'
 
@@ -374,30 +374,81 @@ export default async function WeeklySetPage({
         Plan na tydzień
       </h2>
       {/* Dni to tylko podpowiedź kolejności — nic nie stoi na przeszkodzie, żeby
-          ugotować je w innym porządku, więc nie obiecujemy nic ponad to. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {set.recipes.map((r: any, i: number) => (
-          <div key={r.id}>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                {DAYS[i] ?? `Dzień ${i + 1}`}
-              </span>
-              {/* Odrzucenie dania dopisuje je do „pomin" i przelicza cały zestaw —
-                  reszta dni może się przy tym zmienić, bo dobór szuka wspólnych produktów. */}
-              <Link
-                href={swapHref(r.id)}
-                scroll={false}
-                aria-label={`Zamień danie: ${r.title}`}
-                className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-500 hover:border-[#12b76a] hover:text-[#12b76a] transition-colors"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Zamień
-              </Link>
-            </div>
-            <RecipeCard recipe={r} index={i} />
+          ugotować je w innym porządku, więc nie obiecujemy nic ponad to.
+          Dwie tabele zamiast siatki kart: plan tygodnia czyta się rzędami (dzień,
+          danie, koszt), a nie zdjęciami — w kartach dzień ginął pod fotografią. */}
+      {(() => {
+        const polowa = Math.ceil(set.recipes.length / 2)
+        const grupy = [set.recipes.slice(0, polowa), set.recipes.slice(polowa)]
+        return (
+          <div className="grid gap-5 lg:grid-cols-2">
+            {grupy.map((grupa: any[], g: number) =>
+              grupa.length === 0 ? null : (
+                <div key={g} className="overflow-x-auto rounded-2xl border border-stone-100 bg-white">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stone-100">
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-400">Dzień</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-400">Danie</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-stone-400">Zakupy</th>
+                        <th className="px-4 py-3"><span className="sr-only">Zamiana dania</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {grupa.map((r: any, j: number) => {
+                        const i = g * polowa + j
+                        return (
+                          <tr key={r.id} className="border-b border-stone-100 last:border-0">
+                            <td className="px-4 py-3 align-middle whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-stone-400">
+                              {DAYS[i] ?? `Dzień ${i + 1}`}
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <Link href={`/przepis/${r.slug}`} className="group flex items-center gap-3">
+                                {r.image_url ? (
+                                  <Image
+                                    src={r.image_url}
+                                    alt=""
+                                    width={56}
+                                    height={56}
+                                    className="h-14 w-14 flex-shrink-0 rounded-lg object-cover"
+                                  />
+                                ) : (
+                                  <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-stone-100">
+                                    <ShoppingBasket className="h-5 w-5 text-stone-300" />
+                                  </span>
+                                )}
+                                <span className="font-semibold leading-snug text-stone-800 line-clamp-2 transition-colors group-hover:text-[#12b76a]">
+                                  {r.title}
+                                </span>
+                              </Link>
+                            </td>
+                            <td className="px-4 py-3 align-middle whitespace-nowrap text-right font-bold text-amber-600">
+                              {formatPrice(r.price_total)}
+                            </td>
+                            <td className="px-4 py-3 align-middle text-right">
+                              {/* Odrzucenie dania dopisuje je do „pomin" i przelicza cały zestaw —
+                                  reszta dni może się przy tym zmienić, bo dobór szuka wspólnych produktów. */}
+                              <Link
+                                href={swapHref(r.id)}
+                                scroll={false}
+                                aria-label={`Zamień danie: ${r.title}`}
+                                className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border-2 border-stone-200 bg-white px-4 py-2.5 text-sm font-bold text-stone-600 transition-colors hover:border-[#12b76a] hover:bg-[#f0fdf6] hover:text-[#12b76a]"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                Zamień
+                              </Link>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            )}
           </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {skipped.size > 0 && (
         <p className="mt-5 text-sm text-stone-500">

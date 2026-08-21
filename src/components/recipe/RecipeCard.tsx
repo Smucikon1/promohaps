@@ -114,10 +114,6 @@ export function RecipeCard({ recipe, index = 0 }: RecipeCardProps) {
             {recipe.title}
           </h3>
 
-          {recipe.description && (
-            <p className="text-stone-500 text-sm line-clamp-2 mb-3">{recipe.description}</p>
-          )}
-
           <div className="flex items-center gap-3 text-xs text-stone-500">
             {recipe.prep_time_min && (
               <span className="flex items-center gap-1">
