@@ -1,19 +1,28 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback } from 'react'
-import { ChefHat, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useRef, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { cn } from '@/lib/utils'
 import type { Recipe } from '@/types'
 
+interface Props {
+  title: string
+  recipes: Recipe[]
+  /** Ikona przy nagłówku — element, nie komponent, bo przekazujemy ją z serwera */
+  icon?: ReactNode
+  /** Dopisek po prawej stronie nagłówka, np. próg cenowy */
+  aside?: string
+}
+
 /**
- * Pozioma karuzela najpopularniejszych dań, które udało się odtworzyć z gazetek.
+ * Pozioma karuzela przepisów.
  *
- * Przewijanie jest natywne (scroll-snap), więc na telefonie działa gestem bez
- * jednej linii JS. Strzałki dokładamy tylko dla myszy — na dotyku byłyby zbędnym
- * elementem zasłaniającym karty.
+ * Przewijanie jest natywne (scroll-snap), więc na telefonie działa gestem bez jednej
+ * linii JS. Strzałki dokładamy tylko dla myszy — na dotyku byłyby zbędnym elementem
+ * zasłaniającym karty.
  */
-export function PopularDishesCarousel({ recipes }: { recipes: Recipe[] }) {
+export function RecipeCarousel({ title, recipes, icon, aside }: Props) {
   const track = useRef<HTMLDivElement>(null)
   const [atStart, setAtStart] = useState(true)
   const [atEnd, setAtEnd] = useState(false)
@@ -29,8 +38,6 @@ export function PopularDishesCarousel({ recipes }: { recipes: Recipe[] }) {
 
   useEffect(() => {
     sync()
-    const el = track.current
-    if (!el) return
     window.addEventListener('resize', sync)
     return () => window.removeEventListener('resize', sync)
   }, [sync])
@@ -38,24 +45,28 @@ export function PopularDishesCarousel({ recipes }: { recipes: Recipe[] }) {
   const nudge = (dir: 1 | -1) => {
     const el = track.current
     if (!el) return
-    // Przewijamy o szerokość widocznego okna minus zakładka, żeby użytkownik
-    // widział, że lista jest ciągła, a nie skacze do zupełnie nowego zestawu.
+    // Przewijamy o szerokość okna minus zakładka, żeby było widać, że lista jest
+    // ciągła, a nie skacze do zupełnie nowego zestawu.
     el.scrollBy({ left: dir * (el.clientWidth * 0.85), behavior: 'smooth' })
   }
 
   if (recipes.length === 0) return null
 
   return (
-    <section className="mb-10">
+    <section className="no-print mb-10">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <ChefHat className="w-5 h-5 text-[#12b76a]" />
-          <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>
-            Klasyczne dania
+        <div className="flex items-baseline gap-2 min-w-0">
+          {icon && <span className="self-center flex-shrink-0">{icon}</span>}
+          <h2
+            className="text-xl font-bold text-stone-900 truncate"
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
+            {title}
           </h2>
+          {aside && <span className="hidden sm:inline text-sm text-stone-500 flex-shrink-0">{aside}</span>}
         </div>
 
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
           <CarouselButton label="Poprzednie" onClick={() => nudge(-1)} disabled={atStart}>
             <ChevronLeft className="w-5 h-5" />
           </CarouselButton>
@@ -86,7 +97,7 @@ function CarouselButton({
   label: string
   onClick: () => void
   disabled: boolean
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <button

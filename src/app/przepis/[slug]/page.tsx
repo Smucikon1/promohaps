@@ -8,7 +8,6 @@ import { formatPrice, formatTime, difficultyLabel, difficultyColor, isPromoActiv
 import { totalSavings, savingsPercent, regularPrice } from '@/lib/savings'
 import { storeColor } from '@/lib/stores'
 import { ShoppingList } from '@/components/recipe/ShoppingList'
-import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { RecipeActions } from '@/components/recipe/RecipeActions'
 import { AdSlot } from '@/components/ads/AdSlot'
@@ -16,6 +15,8 @@ import { RecipeTracker } from '@/components/recipe/RecipeTracker'
 import { RecordView } from '@/components/recipe/RecordView'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
 import { dedupeRecipes, dishFingerprint } from '@/lib/recipeDedupe'
+import { RecipeCarousel } from '@/components/recipe/RecipeCarousel'
+import { productKey } from '@/lib/weeklySet'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -86,24 +87,48 @@ export default async function RecipePage({ params }: Props) {
   // koszt w cenach zwykłych, żeby nikt nie poszedł do sklepu z nieaktualną kwotą.
   const shownPrice = promoLive ? normalized.price_total : regularPrice(normalized.price_total, normalized.promo_products)
 
-  // Powiązane przepisy z tego samego sklepu
+  // Przepisy dzielące produkty z tym — sedno oszczędzania w tym serwisie.
+  // „Więcej z tego sklepu" było przypadkową listą; tu każdy kafelek ma powód:
+  // kupujesz jedno opakowanie i starcza na dwa obiady.
   const { data: relatedRaw } = await supabase
     .from('recipes')
-    .select('*, store:stores(*), promo_products(*)')
+    .select('*, store:stores(*), promo_products(*), ingredients(name, price)')
     .eq('is_published', true)
     // Bez ceny przepis nie ma sensu w tej aplikacji — nie pokazujemy niedokończonych
     .gt('price_total', 0)
+    // Ten sam sklep: dzielenie opakowania ma sens tylko przy jednych zakupach
     .eq('store_id', normalized.store_id)
     .neq('id', normalized.id)
     .order('created_at', { ascending: false })
-    .limit(6)
-  // Powiązane: bez wygasłych promocji, bez innego wariantu TEGO dania i bez duplikatów między sobą
+    .limit(40)
+
+  // Podstawy z szafki (price null) odpadają — wspólna sól nie jest powodem,
+  // żeby ugotować drugie danie, a zawyżałaby liczbę trafień każdemu przepisowi.
+  const kluczeProduktow = (lista: any[]) =>
+    new Set(
+      (lista ?? [])
+        .filter((i: any) => typeof i?.price === 'number' && i.price > 0 && i?.name)
+        .map((i: any) => productKey(i.name))
+        .filter(Boolean)
+    )
+  const mojeKlucze = kluczeProduktow(normalized.ingredients)
+  const ileWspolnych = (r: any) => {
+    let n = 0
+    for (const k of kluczeProduktow(r.ingredients)) if (mojeKlucze.has(k)) n++
+    return n
+  }
+
   const currentDish = dishFingerprint(normalized.title)
   const related = dedupeRecipes(
     (relatedRaw ?? []).filter(
       (r: any) => hasActivePromo(r.promo_products) && dishFingerprint(r.title) !== currentDish
     )
-  ).slice(0, 3)
+  )
+    .map((r: any) => ({ r, wspolnych: ileWspolnych(r) }))
+    .filter((x) => x.wspolnych > 0)
+    .sort((a, b) => b.wspolnych - a.wspolnych)
+    .slice(0, 8)
+    .map((x) => x.r)
 
   // "Podobne, ale taniej" — z tej samej kategorii, tańsze niż bieżący, dowolny sklep.
   // Podnosi PV/session (użytkownik klika dalej) → więcej wyświetleń reklam.
@@ -120,7 +145,7 @@ export default async function RecipePage({ params }: Props) {
       .in('recipe_categories.category_id', currentCatIds)
       .neq('id', normalized.id)
       .order('price_total', { ascending: true })
-      .limit(8)
+      .limit(14)
     const cheaperNormalized = (cheaperRaw ?? []).map((r: any) => ({
       ...r,
       categories: r.categories?.map((rc: any) => rc.category).filter(Boolean) ?? [],
@@ -208,10 +233,6 @@ export default async function RecipePage({ params }: Props) {
               {normalized.title}
             </h1>
           </div>
-        )}
-
-        {normalized.description && (
-          <p className="text-stone-600 text-lg leading-relaxed mb-5">{normalized.description}</p>
         )}
 
         {/* Promocja wygasła — przepis zostaje, ale cena promocyjna jest już nieaktualna */}
@@ -355,37 +376,24 @@ export default async function RecipePage({ params }: Props) {
         </div>
 
         {/* Podobne, ale taniej — z tej samej kategorii, niższa cena */}
-        {cheaper.length > 0 && (
-          <section className="no-print mt-16">
-            <div className="flex items-baseline justify-between gap-3 mb-6 flex-wrap">
-              <h2 className="text-2xl font-bold text-stone-900" style={{ fontFamily: 'var(--font-serif)' }}>
-                Podobne, ale taniej
-              </h2>
-              <span className="text-sm text-stone-500">
-                Do {formatPrice(currentPrice)} — te są tańsze
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {cheaper.map((r: any, i: number) => (
-                <RecipeCard key={r.id} recipe={r} index={i} />
-              ))}
-            </div>
-          </section>
-        )}
+        <div className="mt-16">
+          <RecipeCarousel
+            title="Podobne, ale taniej"
+            recipes={cheaper}
+            aside={`taniej niż ${formatPrice(currentPrice)}`}
+            icon={<Wallet className="w-5 h-5 text-[#12b76a]" />}
+          />
+        </div>
 
-        {/* Powiązane przepisy */}
-        {related.length > 0 && (
-          <section className="no-print mt-16">
-            <h2 className="text-2xl font-bold text-stone-900 mb-6" style={{ fontFamily: 'var(--font-serif)' }}>
-              Więcej z {normalized.store?.name ?? 'tego sklepu'}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {related.map((r: any, i: number) => (
-                <RecipeCard key={r.id} recipe={r} index={i} />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Wspólne produkty — jedno opakowanie na dwa obiady */}
+        <div className="mt-16">
+          <RecipeCarousel
+            title="Z tych samych produktów"
+            recipes={related}
+            aside="jedno opakowanie starczy na dwa dania"
+            icon={<ShoppingBag className="w-5 h-5 text-[#12b76a]" />}
+          />
+        </div>
 
         {/* Ostatnio oglądane */}
         <div className="no-print">

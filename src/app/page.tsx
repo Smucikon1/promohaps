@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeFilters } from '@/components/recipe/RecipeFilters'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
-import { PopularDishesCarousel } from '@/components/recipe/PopularDishesCarousel'
+import { RecipeCarousel } from '@/components/recipe/RecipeCarousel'
 import { FilterTransitionProvider, ResultsPending } from '@/components/recipe/FilterTransition'
 import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { dedupeRecipes } from '@/lib/recipeDedupe'
@@ -11,7 +11,7 @@ import { savingsPercent, soonestPromoEnd } from '@/lib/savings'
 import { favoriteCounts } from '@/lib/favoriteCounts'
 import { cachedStores, cachedCategories, cachedCheapest, cachedEndingSoon, ENDING_SOON_DAYS, cachedPopularDishes, MIN_POPULAR_DISHES } from '@/lib/catalog'
 import { AdSlot } from '@/components/ads/AdSlot'
-import { Flame, Hourglass } from 'lucide-react'
+import { Flame, Hourglass, ChefHat } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Store, Category } from '@/types'
@@ -82,7 +82,13 @@ function SectionSkeleton({ height }: { height: number }) {
 async function PopularDishesSection() {
   const recipes = await cachedPopularDishes()
   if (recipes.length < MIN_POPULAR_DISHES) return null
-  return <PopularDishesCarousel recipes={recipes} />
+  return (
+    <RecipeCarousel
+      title="Klasyczne dania"
+      recipes={recipes}
+      icon={<ChefHat className="w-5 h-5 text-[#12b76a]" />}
+    />
+  )
 }
 
 async function CheapestSection() {
