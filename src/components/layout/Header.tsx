@@ -57,9 +57,10 @@ export function Header() {
           <span className="text-[#161918]">Gazetki</span>
         </Link>
 
-        {/* Zeszło tu z hero na stronie głównej. Na telefonie chowamy — przy wąskim
-            pasku wypychało ikony koszyka poza ekran. */}
-        <span className="hidden sm:inline ml-3 text-[11px] font-semibold uppercase tracking-wider text-stone-400 whitespace-nowrap">
+        {/* Zeszło tu z hero na stronie głównej. Na telefonie ciaśniej i mniejszym
+            stopniem — koszyk i ulubione są tam ukryte (hidden md:flex), więc obok
+            logo zostaje tylko lupa i dopisek się mieści. */}
+        <span className="ml-2 sm:ml-3 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-stone-400 whitespace-nowrap">
           Przepisy gazetkowe
         </span>
 
