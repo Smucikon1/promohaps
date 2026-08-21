@@ -380,8 +380,55 @@ export default async function WeeklySetPage({
       {(() => {
         const polowa = Math.ceil(set.recipes.length / 2)
         const grupy = [set.recipes.slice(0, polowa), set.recipes.slice(polowa)]
+        const dzienLabel = (i: number) => DAYS[i] ?? `Dzień ${i + 1}`
         return (
-          <div className="grid gap-5 lg:grid-cols-2">
+          <>
+          {/* Telefon dostaje listę, nie tabelę. Cztery kolumny — miniatura, tytuł,
+              cena i przycisk — nie mieszczą się w 375 px i wymuszały przewijanie
+              w bok, czyli dokładnie to, czego w interfejsie nie powinno być. */}
+          <ul className="sm:hidden divide-y divide-stone-100 rounded-2xl border border-stone-100 bg-white">
+            {set.recipes.map((r: any, i: number) => (
+              <li key={r.id} className="p-4">
+                <span className="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-2">
+                  {dzienLabel(i)}
+                </span>
+                <Link href={`/przepis/${r.slug}`} className="flex items-start gap-3">
+                  {r.image_url ? (
+                    <Image
+                      src={r.image_url}
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="h-14 w-14 flex-shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-stone-100">
+                      <ShoppingBasket className="h-5 w-5 text-stone-300" />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold leading-snug text-stone-800 break-words">
+                      {r.title}
+                    </span>
+                    <span className="mt-1 block font-bold text-amber-600">
+                      {formatPrice(r.price_total)}
+                    </span>
+                  </span>
+                </Link>
+                <Link
+                  href={swapHref(r.id)}
+                  scroll={false}
+                  aria-label={`Zamień danie: ${r.title}`}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-stone-200 bg-white px-4 py-2.5 text-sm font-bold text-stone-600 transition-colors hover:border-[#12b76a] hover:text-[#12b76a]"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Zamień
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden sm:grid gap-5 lg:grid-cols-2">
             {grupy.map((grupa: any[], g: number) =>
               grupa.length === 0 ? null : (
                 <div key={g} className="overflow-x-auto rounded-2xl border border-stone-100 bg-white">
@@ -399,7 +446,7 @@ export default async function WeeklySetPage({
                         const i = g * polowa + j
                         return (
                           <tr key={r.id} className="border-b border-stone-100 last:border-0">
-                            <td className="px-4 py-3 align-middle whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-stone-400">
+                            <td className="px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wider text-stone-400">
                               {DAYS[i] ?? `Dzień ${i + 1}`}
                             </td>
                             <td className="px-4 py-3 align-middle">
@@ -417,7 +464,7 @@ export default async function WeeklySetPage({
                                     <ShoppingBasket className="h-5 w-5 text-stone-300" />
                                   </span>
                                 )}
-                                <span className="font-semibold leading-snug text-stone-800 line-clamp-2 transition-colors group-hover:text-[#12b76a]">
+                                <span className="font-semibold leading-snug text-stone-800 line-clamp-2 break-words transition-colors group-hover:text-[#12b76a]">
                                   {r.title}
                                 </span>
                               </Link>
@@ -447,6 +494,7 @@ export default async function WeeklySetPage({
               )
             )}
           </div>
+          </>
         )
       })()}
 
