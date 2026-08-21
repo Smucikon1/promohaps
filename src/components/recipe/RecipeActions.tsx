@@ -28,8 +28,11 @@ export function RecipeActions({ recipe }: { recipe: FavoriteRecipe }) {
     }
   }
 
+  // Jeden rząd z przewijaniem zamiast zawijania: „Drukuj" spadał na telefonie
+  // do drugiego rzędu i rozbijał pasek akcji. -mx-4 px-4 daje przewijanie od
+  // krawędzi do krawędzi, a shrink-0 nie pozwala ścisnąć przycisków.
   return (
-    <div className="no-print flex flex-wrap items-center gap-2">
+    <div className="no-print flex flex-nowrap items-center gap-2 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
       <FavoriteButton variant="inline" recipe={recipe} />
 
       <PinterestSaveButton

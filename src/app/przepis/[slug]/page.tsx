@@ -251,7 +251,7 @@ export default async function RecipePage({ params }: Props) {
         )}
 
         {/* Akcje przepisu (Wróć jest teraz pływający pod logotypem w layout) */}
-        <div className="no-print flex flex-wrap items-center gap-3 mb-6">
+        <div className="no-print mb-6">
           <RecipeActions
             recipe={{
               id: normalized.id,
