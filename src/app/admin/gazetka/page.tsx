@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { LeafletEngine } from '@/components/admin/LeafletEngine'
+import { ClassicRecipes } from '@/components/admin/ClassicRecipes'
 
 export default async function AdminLeafletPage() {
   const supabase = await createClient()
@@ -18,6 +19,11 @@ export default async function AdminLeafletPage() {
         Wczytaj gazetkę → AI odczyta promocje → wygeneruj przepis‑szkic → zaakceptuj i opublikuj.
       </p>
       <LeafletEngine stores={stores ?? []} />
+
+      {/* Automat dobiera dania sam, ale czasem po prostu wiadomo, ze brakuje schabowego */}
+      <div className="mt-10">
+        <ClassicRecipes stores={stores ?? []} />
+      </div>
     </div>
   )
 }
