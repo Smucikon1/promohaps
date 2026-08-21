@@ -324,7 +324,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
         <FilterTransitionProvider>
           {/* Sklepy i filtry na samej górze — jako główna nawigacja, nad afiszem */}
           <Suspense>
-            <div className="mb-8 bg-white rounded-2xl p-5 border border-stone-100 md:sticky md:top-16 md:z-40">
+            <div className="mb-8 bg-white rounded-2xl p-3 sm:p-5 border border-stone-100 sticky top-16 z-40">
               <RecipeFilters stores={stores ?? []} categories={categories ?? []} />
             </div>
           </Suspense>
