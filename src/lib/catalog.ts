@@ -104,8 +104,16 @@ export const cachedPopularDishes = unstable_cache(
       best.set(dish.nazwa, { recipe: r, ranga: dish.ranga })
     }
 
+    // Domyslnie od najtanszych, nie od najpopularniejszych. Sortowanie ranga
+    // ustawialo na czele kanon, ktory czesto pochodzi z jednego sklepu - cena
+    // miesza sklepy sama z siebie i jest zgodna z obietnica serwisu.
+    // Ranga zostaje jako rozstrzygniecie przy rownej cenie.
     return [...best.values()]
-      .sort((a, b) => b.ranga - a.ranga)
+      .sort((a, b) => {
+        const ca = a.recipe.price_total ?? Infinity
+        const cb = b.recipe.price_total ?? Infinity
+        return ca !== cb ? ca - cb : b.ranga - a.ranga
+      })
       .slice(0, 12)
       .map((x) => x.recipe)
   },

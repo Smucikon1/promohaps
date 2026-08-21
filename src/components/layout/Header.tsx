@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { ShoppingCart, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { countShoppingItems, SHOPPING_EVENT } from '@/lib/shopping'
+import { countShoppingRecipes, SHOPPING_EVENT } from '@/lib/shopping'
 import { countFavorites, FAVORITES_EVENT } from '@/lib/favorites'
 import { SearchToggle } from '@/components/layout/SearchToggle'
 
@@ -21,7 +21,7 @@ export function Header() {
 
   useEffect(() => {
     const update = () => {
-      setCount(countShoppingItems())
+      setCount(countShoppingRecipes())
       setFavCount(countFavorites())
     }
     update()

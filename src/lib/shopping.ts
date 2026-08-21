@@ -31,6 +31,28 @@ export function notifyShoppingUpdated() {
   window.dispatchEvent(new Event(SHOPPING_EVENT))
 }
 
+/**
+ * Ile PRZEPISÓW jest na liście zakupów.
+ *
+ * Każdy klucz w localStorage to jedna lista jednego przepisu, więc liczymy klucze,
+ * a nie pozycje w środku. Plakietka w nawigacji ma mówić „masz 3 przepisy do
+ * ugotowania", a nie „masz 27 rzeczy do kupienia" — ta druga liczba rośnie
+ * przy każdym dodaniu i przestaje cokolwiek znaczyć.
+ */
+export function countShoppingRecipes(): number {
+  if (typeof window === 'undefined') return 0
+  let ile = 0
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (!key || !key.startsWith(SHOPPING_PREFIX)) continue
+    try {
+      const items = JSON.parse(localStorage.getItem(key) || '[]')
+      if (Array.isArray(items) && items.length > 0) ile++
+    } catch {}
+  }
+  return ile
+}
+
 // Łączna liczba pozycji we wszystkich listach (wszystkie przepisy)
 export function countShoppingItems(): number {
   if (typeof window === 'undefined') return 0

@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Home, ShoppingCart, Heart, ShoppingBasket } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { countShoppingItems, SHOPPING_EVENT } from '@/lib/shopping'
+import { countShoppingRecipes, SHOPPING_EVENT } from '@/lib/shopping'
 import { countFavorites, FAVORITES_EVENT } from '@/lib/favorites'
 
 const EVENTS = [SHOPPING_EVENT, FAVORITES_EVENT, 'focus', 'storage']
@@ -14,10 +14,20 @@ export function BottomNav() {
   const pathname = usePathname()
   const [cart, setCart] = useState(0)
   const [fav, setFav] = useState(0)
+  // Mikroanimacja plakietki po dodaniu przepisu do listy. Trzymamy poprzedni stan
+  // w ref, bo animujemy tylko WZROST — przy kasowaniu pozycji puls bylby mylacy.
+  const [puls, setPuls] = useState(false)
+  const poprzedni = useRef<number | null>(null)
 
   useEffect(() => {
     const update = () => {
-      setCart(countShoppingItems())
+      const ile = countShoppingRecipes()
+      setCart(ile)
+      if (poprzedni.current !== null && ile > poprzedni.current) {
+        setPuls(true)
+        window.setTimeout(() => setPuls(false), 500)
+      }
+      poprzedni.current = ile
       setFav(countFavorites())
     }
     update()
@@ -56,7 +66,12 @@ export function BottomNav() {
             <span className="relative">
               <t.icon className={cn('w-[22px] h-[22px]', t.active && t.fill && 'fill-current')} />
               {t.badge > 0 && (
-                <span className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                <span
+                  className={cn(
+                    'absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold pointer-events-none',
+                    puls && t.href === '/lista-zakupow' && 'animate-badge-pop'
+                  )}
+                >
                   {t.badge}
                 </span>
               )}
