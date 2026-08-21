@@ -306,13 +306,6 @@ export default async function RecipePage({ params }: Props) {
               </div>
             </div>
           )}
-          {percent > 0 && (
-            <div className="flex-1 min-w-[80px] px-4 text-center">
-              <PiggyBank className="w-5 h-5 text-green-600 mx-auto mb-1" />
-              <div className="font-extrabold text-green-700 text-lg leading-tight">−{percent}%</div>
-              <div className="text-xs text-stone-500">taniej z gazetki</div>
-            </div>
-          )}
         </div>
 
         {percent > 0 && (
@@ -343,6 +336,7 @@ export default async function RecipePage({ params }: Props) {
               recipeId={normalized.id}
               ingredients={normalized.ingredients}
               promoLive={promoLive}
+              savingsPercent={percent}
             />
           </div>
 

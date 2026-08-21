@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ShoppingCart, RotateCcw, Check, Tag, Plus } from 'lucide-react'
+import { ShoppingCart, RotateCcw, Check, Tag, Plus, PiggyBank } from 'lucide-react'
 import { cn, formatPrice } from '@/lib/utils'
 import { useShoppingList } from '@/hooks/useShoppingList'
 import type { ShoppingItem } from '@/lib/shopping'
@@ -13,9 +13,11 @@ interface ShoppingListProps {
   promoProducts?: PromoProduct[]
   // false = promocje wygasły; ceny promocyjne przestają obowiązywać
   promoLive?: boolean
+  /** Oszczędność z gazetki w procentach — pokazujemy ją nad sumą, bo tam pada decyzja zakupowa */
+  savingsPercent?: number
 }
 
-export function ShoppingList({ recipeId, ingredients, promoProducts = [], promoLive = true }: ShoppingListProps) {
+export function ShoppingList({ recipeId, ingredients, promoProducts = [], promoLive = true, savingsPercent = 0 }: ShoppingListProps) {
   const { items, loaded, exists, addAll, removeAll, syncMeta, toggleItem, resetList, checkedCount } =
     useShoppingList(recipeId)
   const [justAdded, setJustAdded] = useState(false)
@@ -195,11 +197,25 @@ export function ShoppingList({ recipeId, ingredients, promoProducts = [], promoL
         )}
       </ul>
 
-      {/* Cena całości (suma cen składników i produktów z gazetki) */}
+      {/* Cena całości (suma cen składników i produktów z gazetki).
+          Oszczędność stoi nad sumą, a nie w pasku statystyk na górze strony:
+          liczba mówi coś dopiero w zestawieniu z kwotą, której dotyczy, a pasek
+          i tak był przeładowany pięcioma kafelkami. */}
       {totalPrice > 0 && (
-        <div className="px-5 py-3.5 border-t border-stone-100 flex items-center justify-between">
-          <span className="text-sm font-semibold text-stone-700">Razem</span>
-          <span className="text-lg font-bold text-amber-600">{formatPrice(totalPrice)}</span>
+        <div className="px-5 py-3.5 border-t border-stone-100">
+          {savingsPercent > 0 && (
+            <div className="mb-2 flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-500">
+                <PiggyBank className="w-4 h-4 text-green-600" />
+                taniej z gazetki
+              </span>
+              <span className="text-sm font-extrabold text-green-700">−{savingsPercent}%</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-stone-700">Razem</span>
+            <span className="text-lg font-bold text-amber-600">{formatPrice(totalPrice)}</span>
+          </div>
         </div>
       )}
 
