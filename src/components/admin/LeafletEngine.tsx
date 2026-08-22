@@ -166,6 +166,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const [theme, setTheme] = useState('')
   const [adresGazetki, setAdresGazetki] = useState('')
   const [dostepne, setDostepne] = useState<any[] | null>(null)
+  // Postęp całego przebiegu: odczyt → zapis → trzy zestawy przepisów.
+  // batchStatus pokazuje szczegół bieżącego kroku, to — który krok z ilu.
+  const [etap, setEtap] = useState<{ nazwa: string; nr: number; z: number } | null>(null)
   const [szukam, setSzukam] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [batchStatus, setBatchStatus] = useState('')
@@ -316,6 +319,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         setExtracting(false)
         await przetworzStrony(pdfStrony)
         setDostepne(null)
+        await generujKomplet()
         return
       }
 
@@ -335,6 +339,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
       setExtracting(false)
       await przetworzStrony(strony)
       setDostepne(null)
+      await generujKomplet()
     } catch (e: any) {
       setExtracting(false)
       setProgress('')
@@ -639,6 +644,33 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     }
   }
 
+  /**
+   * Pełny przebieg po wczytaniu gazetki: zapis promocji i trzy zestawy przepisów
+   * (dwa razy dziewięć klasyków plus dwanaście pod filtry serwisu) — łącznie 30 szkiców.
+   *
+   * Idzie sekwencyjnie, nie równolegle: każdy przepis musi widzieć tytuły poprzednich,
+   * inaczej trzydzieści równoległych wywołań wyprodukowałoby trzydzieści wariantów
+   * tego samego dania.
+   */
+  const generujKomplet = async () => {
+    const kroki = [
+      { nazwa: 'Zapisuję promocje', fn: savePromos },
+      { nazwa: 'Klasyki — pierwsza dziewiątka', fn: generateClassicSet },
+      { nazwa: 'Klasyki — druga dziewiątka', fn: generateClassicSet },
+      { nazwa: 'Zestaw pod filtry serwisu', fn: generateSet },
+    ]
+    for (let i = 0; i < kroki.length; i++) {
+      setEtap({ nazwa: kroki[i].nazwa, nr: i + 1, z: kroki.length })
+      try {
+        await kroki[i].fn()
+      } catch {
+        // Nieudany krok nie może zatrzymać pozostałych — lepiej mieć część szkiców
+      }
+    }
+    setEtap(null)
+    setSavedMsg('✅ Gazetka wczytana, szkice wygenerowane — sprawdź i opublikuj.')
+  }
+
   // Zestaw 9 klasyków: 3 obiady, 2 fit, 2 zupy, 2 wege.
   //
   // Każdy slot dostaje z góry PRZYPISANE, inne danie z listy klasyków. Wcześniejsze
@@ -749,6 +781,32 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
 
   return (
     <div className="space-y-6">
+      {/* Nakładka na czas całego przebiegu. Trzydzieści szkiców powstaje kilka minut,
+          więc bez niej wyglądałoby to jak zawieszona strona i łatwo byłoby zamknąć
+          kartę w połowie — a przerwany przebieg zostawia część promocji bez przepisów. */}
+      {etap && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+            <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-[#12b76a]" />
+            <p className="text-base font-bold text-stone-800">{etap.nazwa}</p>
+            <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Krok {etap.nr} z {etap.z}
+            </p>
+            {(batchStatus || progress) && (
+              <p className="mt-3 text-sm text-stone-500">{batchStatus || progress}</p>
+            )}
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-stone-100">
+              <div
+                className="h-full rounded-full bg-[#12b76a] transition-all duration-500"
+                style={{ width: `${Math.round((etap.nr / etap.z) * 100)}%` }}
+              />
+            </div>
+            <p className="mt-4 text-xs text-stone-400">
+              Powstaje 30 szkiców — to potrwa kilka minut. Nie zamykaj tej karty.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Krok 1 — odczyt gazetki */}
       <div className="bg-white rounded-2xl border border-stone-100 p-6 space-y-4">
         <div className="flex items-center gap-2">
@@ -1027,6 +1085,15 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
             >
               {batchStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               Zestaw 9 klasyków
+            </button>
+            <button
+              onClick={generujKomplet}
+              disabled={generating || products.length === 0}
+              title="Zapis promocji i 30 szkiców: dwa razy 9 klasyków plus 12 pod filtry"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#12b76a] bg-white px-4 py-2.5 text-sm font-semibold text-[#0c7d49] hover:bg-[#e6f9f0] disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4" />
+              Komplet 30 szkiców
             </button>
           </div>
           {batchStatus && (

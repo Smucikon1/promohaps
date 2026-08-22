@@ -26,6 +26,13 @@ export interface ZnalezionaGazetka {
   daty?: string
 }
 
+// Ujednolica polskie znaki. Trzy linijki na miejscu zamiast zaleznosci od modulu
+// z lista dan — ten plik nie ma powodu wiedziec o istnieniu przepisow.
+function normalizePl(x: string): string {
+  return String(x ?? "").toLowerCase().replace(/[ąćęłńóśźż]/g, (c) =>
+    (({ ą:"a", ć:"c", ę:"e", ł:"l", ń:"n", ó:"o", ś:"s", ź:"z", ż:"z" } as any)[c] ?? c))
+}
+
 const UA = 'Mozilla/5.0 (compatible; zGazetki/1.0)'
 const TIMEOUT_MS = 15_000
 
@@ -344,6 +351,37 @@ const ZRODLA: Record<string, Zrodlo> = {
   // ukrywanie się przed blokadą, więc dla Kauflandu zostaje ręczne wklejenie adresu.
 }
 
+// Wydania, z których nie da się ugotować obiadu. Sieci wypuszczają obok gazetek
+// spożywczych osobne katalogi szkolne, meblowe i alkoholowe — odczyt przemieliłby
+// je bez pożytku, a płacisz za każdą stronę wysłaną do modelu.
+const NIESPOZYWCZE = [
+  /non.?food/i,
+  /\bhome\b/i,
+  /\bszkol/i,
+  /wyprawk/i,
+  /\bmebl/i,
+  /\bogrod/i,
+  /\bmoda\b|\bodziez/i,
+  /tekstyl/i,
+  /przemyslow/i,
+  /\bzabawk/i,
+  // BTS = back to school; Netto tak oznacza katalogi szkolne
+  /\bbts\b|back.?to.?school/i,
+  /\bszkoln/i,
+  /\bagd\b|\brtv\b/i,
+  // Alkohol to formalnie spożywka, ale katalog samych win nie da żadnego przepisu
+  /\balko/i,
+  /\bwina\b|\bwino\b/i,
+  /\bmocne\b/i,
+  /whisky|piwo\b/i,
+]
+
+/** Czy z tego wydania da się w ogóle ugotować — po tytule, bo treści jeszcze nie znamy */
+export function czySpozywcza(tytul: string): boolean {
+  const t = normalizePl(tytul)
+  return !NIESPOZYWCZE.some((re) => re.test(t))
+}
+
 export function obslugiwaneSklepy(): string[] {
   return Object.keys(ZRODLA)
 }
@@ -351,5 +389,7 @@ export function obslugiwaneSklepy(): string[] {
 export async function znajdzGazetki(storeSlug: string, limit = 5): Promise<ZnalezionaGazetka[]> {
   const zrodlo = ZRODLA[storeSlug]
   if (!zrodlo) return []
-  return zrodlo(limit)
+  // Pobieramy z zapasem, bo część wydań odpadnie jako niespożywcza
+  const wszystkie = await zrodlo(limit * 3)
+  return wszystkie.filter((g) => czySpozywcza(g.tytul)).slice(0, limit)
 }
