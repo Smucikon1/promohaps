@@ -144,6 +144,15 @@ async function pdfToPages(file: File, onProgress: (done: number, total: number) 
   return pages
 }
 
+// Strony gazetek sieci obsługiwanych ręcznie. Trzymane w kodzie, a nie w bazie,
+// bo zmieniają się rzadko, a dopisanie sklepu ma być jedną linijką, nie migracją.
+const RECZNE: Record<string, string> = {
+  kaufland: 'https://www.kaufland.pl/gazetka.html',
+  carrefour: 'https://www.carrefour.pl/gazetki',
+  auchan: 'https://www.auchan.pl/pl/gazetki',
+  aldi: 'https://www.aldi.pl/gazetki.html',
+}
+
 export function LeafletEngine({ stores }: { stores: Store[] }) {
   const [storeSlug, setStoreSlug] = useState(stores[0]?.slug ?? '')
   const [extracting, setExtracting] = useState(false)
@@ -252,9 +261,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   }
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const pliki = [...(e.target.files ?? [])]
     e.target.value = '' // pozwala wgrać ten sam plik drugi raz
-    if (file) await przetworzPlik(file)
+    if (pliki.length) await przetworzPliki(pliki)
   }
 
   // Pyta stronę sieci o listę aktualnych wydań. Biedronka trzyma je pod własnym
@@ -366,15 +375,25 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     }
   }
 
-  // Wspólna ścieżka dla pliku z dysku i pliku pobranego po adresie — dalej wszystko
+  // Wspólna ścieżka dla plików z dysku i pliku pobranego po adresie — dalej wszystko
   // dzieje się tak samo: pdf.js rozkłada strony, paczki lecą do odczytu.
-  const przetworzPlik = async (file: File) => {
-    if (file.size > 100 * 1024 * 1024) {
-      setError('Plik za duży (maks. 100 MB).')
+  const przetworzPlik = async (file: File) => przetworzPliki([file])
+
+  /**
+   * Wiele plików naraz — kluczowe dla sieci, których nie umiemy wykryć automatycznie
+   * (Kaufland, Carrefour, Auchan, Aldi). Gazetka zapisana jako kilkanaście obrazów
+   * stron szła wcześniej pojedynczo, więc każdy obraz uruchamiał osobny odczyt.
+   */
+  const przetworzPliki = async (pliki: File[]) => {
+    if (pliki.some((f) => f.size > 100 * 1024 * 1024)) {
+      setError('Któryś z plików jest za duży (maks. 100 MB).')
       return
     }
 
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    // Kolejność stron bierze się z nazw plików. Przeglądarka oddaje je w kolejności
+    // zaznaczania, a numeric sprawia, że „str-10" idzie po „str-9", nie po „str-1".
+    const posortowane = [...pliki].sort((a, b) => a.name.localeCompare(b.name, 'pl', { numeric: true }))
+
     setExtracting(true)
     setError('')
     setSavedMsg('')
@@ -382,14 +401,25 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
 
     try {
       // 1) Przygotowanie stron (PDF rozkładamy na obrazy w przeglądarce)
-      let pages: PageImage[]
-      if (isPdf) {
-        setProgress('Wczytuję PDF...')
-        pages = await pdfToPages(file, (done, total) => setProgress(`Renderuję strony: ${done}/${total}`))
-      } else {
-        pages = [await imageToPage(file)]
+      const pages: PageImage[] = []
+      for (let i = 0; i < posortowane.length; i++) {
+        const file = posortowane[i]
+        const isPdf =
+          file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        const skad = posortowane.length > 1 ? ` (plik ${i + 1}/${posortowane.length})` : ''
+        if (isPdf) {
+          setProgress(`Wczytuję PDF${skad}...`)
+          pages.push(
+            ...(await pdfToPages(file, (done, total) =>
+              setProgress(`Renderuję strony: ${done}/${total}${skad}`)
+            ))
+          )
+        } else {
+          setProgress(`Przygotowuję obrazy: ${i + 1}/${posortowane.length}`)
+          pages.push(await imageToPage(file))
+        }
       }
-      if (pages.length === 0) throw new Error('PDF nie zawiera stron.')
+      if (pages.length === 0) throw new Error('Nie udało się odczytać żadnej strony.')
       await przetworzStrony(pages)
     } catch (err: any) {
       setError(`Błąd: ${err?.message ?? 'nieznany'}`)
@@ -739,9 +769,24 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
           </div>
           <label className="cursor-pointer flex items-center gap-2 btn-outline text-sm">
             {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
-            {extracting ? 'Odczytuję...' : 'Wgraj zdjęcie / PDF gazetki'}
-            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onFile} disabled={extracting} />
+            {extracting ? 'Odczytuję...' : 'Wgraj PDF lub zdjęcia stron'}
+            <input type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={onFile} disabled={extracting} />
           </label>
+
+          {/* Sieci, których nie umiemy wykryć automatycznie: Kaufland i Carrefour
+              odrzucają żądania serwerowe, Auchan i Aldi renderują listę JavaScriptem.
+              Skrót otwiera właściwą stronę, żeby nie szukać jej za każdym razem. */}
+          {RECZNE[storeSlug] && (
+            <a
+              href={RECZNE[storeSlug]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:border-stone-300"
+            >
+              <Link2 className="w-4 h-4" />
+              Otwórz gazetki tego sklepu
+            </a>
+          )}
 
           {/* Wykrywanie wydań wprost ze strony sieci — bez szukania i wklejania */}
           <button
