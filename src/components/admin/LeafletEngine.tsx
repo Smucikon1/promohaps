@@ -156,6 +156,8 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
 
   const [theme, setTheme] = useState('')
   const [adresGazetki, setAdresGazetki] = useState('')
+  const [dostepne, setDostepne] = useState<any[] | null>(null)
+  const [szukam, setSzukam] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [batchStatus, setBatchStatus] = useState('')
   const [drafts, setDrafts] = useState<{ id: string; title: string; editUrl: string; hasImage?: boolean }[]>([])
@@ -255,6 +257,58 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     if (file) await przetworzPlik(file)
   }
 
+  // Pyta stronę sieci o listę aktualnych wydań. Biedronka trzyma je pod własnym
+  // API gazetek, więc nie potrzeba ani agregatora, ani szukania PDF-a ręcznie.
+  const sprawdzGazetki = async () => {
+    setSzukam(true)
+    setError('')
+    setDostepne(null)
+    try {
+      const res = await fetch('/api/gazetki-dostepne', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeSlug }),
+      })
+      const dane = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(dane?.error ?? `Błąd ${res.status}`)
+      setDostepne(dane.gazetki ?? [])
+    } catch (e: any) {
+      setError(e?.message ?? 'Nie udało się sprawdzić gazetek.')
+    } finally {
+      setSzukam(false)
+    }
+  }
+
+  // Ściąga strony wybranego wydania i wpuszcza je w zwykły odczyt
+  const wczytajZnaleziona = async (g: any) => {
+    setExtracting(true)
+    setError('')
+    setSavedMsg('')
+    setProducts([])
+    try {
+      const strony: PageImage[] = []
+      for (let i = 0; i < g.obrazy.length; i++) {
+        setProgress(`Pobieram strony: ${i + 1}/${g.obrazy.length}`)
+        const res = await fetch('/api/pobierz-gazetke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: g.obrazy[i] }),
+        })
+        if (!res.ok) continue // pojedyncza strona nie może zabrać całego wydania
+        const blob = await res.blob()
+        strony.push(await imageToPage(new File([blob], `str-${i + 1}.png`, { type: blob.type })))
+      }
+      if (strony.length === 0) throw new Error('Nie udało się pobrać żadnej strony.')
+      setExtracting(false)
+      await przetworzStrony(strony)
+      setDostepne(null)
+    } catch (e: any) {
+      setExtracting(false)
+      setProgress('')
+      setError(e?.message ?? 'Nie udało się wczytać gazetki.')
+    }
+  }
+
   // Pobiera gazetkę spod adresu i wpuszcza ją w tę samą ścieżkę co plik z dysku.
   // Bez adapterów per sieć: adres wkleja człowiek, więc przebudowa strony sklepu
   // niczego nie psuje — wklejasz nowy link zamiast czekać na poprawkę w kodzie.
@@ -312,7 +366,18 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         pages = [await imageToPage(file)]
       }
       if (pages.length === 0) throw new Error('PDF nie zawiera stron.')
+      await przetworzStrony(pages)
+    } catch (err: any) {
+      setError(`Błąd: ${err?.message ?? 'nieznany'}`)
+      setExtracting(false)
+      setProgress('')
+    }
+  }
 
+  // Odczyt gotowych stron — wspólne dla pliku, PDF-a i gazetki pobranej ze strony sieci
+  const przetworzStrony = async (pages: PageImage[]) => {
+    setExtracting(true)
+    try {
       // 2) Wysyłka partiami — omija limit rozmiaru żądania.
       // Ponawiamy przy błędach sieci, 429 (rate limit — respect Retry-After) i 5xx.
       const fetchBatch = async (slice: PageImage[], attempt = 0): Promise<any> => {
@@ -653,6 +718,44 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
             {extracting ? 'Odczytuję...' : 'Wgraj zdjęcie / PDF gazetki'}
             <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onFile} disabled={extracting} />
           </label>
+
+          {/* Wykrywanie wydań wprost ze strony sieci — bez szukania i wklejania */}
+          <button
+            type="button"
+            onClick={sprawdzGazetki}
+            disabled={szukam || extracting}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#12b76a] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0ea25d] disabled:opacity-50"
+          >
+            {szukam ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+            {szukam ? 'Sprawdzam…' : 'Sprawdź nowe gazetki'}
+          </button>
+
+          {dostepne && (
+            <div className="mt-3 rounded-xl border border-stone-200 divide-y divide-stone-100">
+              {dostepne.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-stone-500">Nie znaleziono wydań.</p>
+              ) : (
+                dostepne.map((g: any) => (
+                  <div key={g.strona} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-stone-800">{g.tytul}</p>
+                      <p className="text-xs text-stone-500">
+                        {g.obrazy.length} stron{g.wciagnieta ? ' · już wciągnięta' : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => wczytajZnaleziona(g)}
+                      disabled={extracting}
+                      className="flex-shrink-0 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-bold text-stone-700 hover:border-[#12b76a] hover:text-[#12b76a] disabled:opacity-50"
+                    >
+                      Wczytaj
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
 
           {/* Wklejenie adresu oszczędza pobieranie pliku na dysk i szukanie go w oknie wyboru */}
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
