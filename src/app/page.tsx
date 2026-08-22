@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { RecipeCard } from '@/components/recipe/RecipeCard'
 import { RecipeFilters } from '@/components/recipe/RecipeFilters'
+import { StickyFilterBar } from '@/components/recipe/StickyFilterBar'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
 import { RecipeCarousel } from '@/components/recipe/RecipeCarousel'
 import { FilterTransitionProvider, ResultsPending } from '@/components/recipe/FilterTransition'
@@ -337,9 +338,9 @@ export default async function HomePage({ searchParams }: HomeProps) {
         <FilterTransitionProvider>
           {/* Sklepy i filtry na samej górze — jako główna nawigacja, nad afiszem */}
           <Suspense>
-            <div className="mb-8 bg-white rounded-2xl p-3 sm:p-5 border border-stone-100 sticky top-16 z-40">
+            <StickyFilterBar>
               <RecipeFilters stores={stores ?? []} categories={categories ?? []} />
-            </div>
+            </StickyFilterBar>
           </Suspense>
 
           {/* Klasyki pod filtrami — moduł znika, gdy nie ma czego pokazać.
