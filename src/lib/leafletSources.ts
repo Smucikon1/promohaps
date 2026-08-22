@@ -287,6 +287,49 @@ async function dino(limit: number): Promise<ZnalezionaGazetka[]> {
   return wynik
 }
 
+// ---------- Netto ----------
+
+/** Identyfikator Netto Polska na platformie Tjek — z niego lecą wszystkie zapytania */
+const NETTO_DEALER = 'acc54D'
+
+/**
+ * Netto: publiczne API platformy Tjek, z której sieć korzysta.
+ *
+ * Najprostsze ze wszystkich źródeł — jedno zapytanie zwraca komplet: etykietę,
+ * okres obowiązywania, liczbę stron i gotowy adres pobrania PDF-a. Żadnego
+ * parsowania HTML-a, więc i nic się nie psuje przy przebudowie strony netto.pl.
+ *
+ * Obrazy stron też są dostępne, ale mają w adresie podpis i szerokość 700 px
+ * wpisaną na sztywno — za mało na pewny odczyt cen. PDF nie ma tego ograniczenia.
+ */
+async function netto(limit: number): Promise<ZnalezionaGazetka[]> {
+  const dane = JSON.parse(
+    await pobierzTekst(
+      `https://squid-api.tjek.com/v2/catalogs?dealer_ids=${NETTO_DEALER}&limit=${Math.max(limit, 8)}`
+    )
+  )
+  if (!Array.isArray(dane)) return []
+
+  return dane
+    .filter((k: any) => k?.pdf_url)
+    .slice(0, limit)
+    .map((k: any) => ({
+      // „Netto Gazetka T35A Food 2026" → „T35A Food"; rok i nazwa sieci nic nie wnoszą,
+      // a podkreślenia z etykiet typu „Netto_MK_Wina_34-35/26" psują czytelność
+      tytul:
+        String(k.label ?? "")
+          .replace(/_/g, " ")
+          .replace(/\bnetto\b|\bgazetka\b|\b20\d{2}\b/gi, " ")
+          .replace(/\s{2,}/g, " ")
+          .trim() || "Gazetka Netto",
+      strona: k.pdf_url,
+      obrazy: [],
+      pdf: k.pdf_url,
+      stron: typeof k.page_count === "number" ? k.page_count : undefined,
+      daty: okres(k.run_from, k.run_till),
+    }))
+}
+
 // ---------- Rejestr ----------
 
 type Zrodlo = (limit: number) => Promise<ZnalezionaGazetka[]>
@@ -295,6 +338,7 @@ const ZRODLA: Record<string, Zrodlo> = {
   biedronka,
   lidl,
   dino,
+  netto,
   // Kaufland odpada: mimo wspólnej z Lidlem infrastruktury Schwarz Group jego
   // własny serwis odrzuca żądania serwerowe (HTTP 403). Obchodzenie tego to już
   // ukrywanie się przed blokadą, więc dla Kauflandu zostaje ręczne wklejenie adresu.
