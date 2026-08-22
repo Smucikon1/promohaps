@@ -286,6 +286,30 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     setSavedMsg('')
     setProducts([])
     try {
+      // Lidl oddaje gotowy PDF całego wydania, Biedronka — osobne obrazy stron.
+      // PDF jest lepszy: jedno pobranie zamiast kilkudziesięciu i pewny układ strony.
+      if (g.pdf) {
+        setProgress('Pobieram PDF gazetki…')
+        const res = await fetch('/api/pobierz-gazetke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: g.pdf }),
+        })
+        if (!res.ok) {
+          const dane = await res.json().catch(() => ({}))
+          throw new Error(dane?.error ?? `Nie udało się pobrać PDF-a (${res.status}).`)
+        }
+        const blob = await res.blob()
+        const pdfStrony = await pdfToPages(
+          new File([blob], 'gazetka.pdf', { type: 'application/pdf' }),
+          (done, total) => setProgress(`Renderuję strony: ${done}/${total}`)
+        )
+        setExtracting(false)
+        await przetworzStrony(pdfStrony)
+        setDostepne(null)
+        return
+      }
+
       const strony: PageImage[] = []
       for (let i = 0; i < g.obrazy.length; i++) {
         setProgress(`Pobieram strony: ${i + 1}/${g.obrazy.length}`)
@@ -740,7 +764,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-stone-800">{g.tytul}</p>
                       <p className="text-xs text-stone-500">
-                        {g.obrazy.length} stron{g.wciagnieta ? ' · już wciągnięta' : ''}
+                        {g.pdf ? `PDF · ${g.stron ?? '?'} stron` : `${g.obrazy.length} stron`}
                       </p>
                     </div>
                     <button
