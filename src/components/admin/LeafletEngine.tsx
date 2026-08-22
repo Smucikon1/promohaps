@@ -761,12 +761,20 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
               ) : (
                 dostepne.map((g: any) => (
                   <div key={g.strona} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                    <div className="min-w-0">
+                    {/* Nazwa i okres w osobnych kolumnach: przy Lidlu wszystkie
+                        wydania nazywają się „Gazetka" i dopiero daty je rozróżniają */}
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-stone-800">{g.tytul}</p>
                       <p className="text-xs text-stone-500">
                         {g.pdf ? `PDF · ${g.stron ?? '?'} stron` : `${g.obrazy.length} stron`}
+                        {g.wciagnieta ? ' · już wciągnięta' : ''}
                       </p>
                     </div>
+                    {g.daty && (
+                      <span className="flex-shrink-0 whitespace-nowrap rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-600 tabular-nums">
+                        {g.daty}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => wczytajZnaleziona(g)}

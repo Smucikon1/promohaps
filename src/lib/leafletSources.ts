@@ -21,6 +21,9 @@ export interface ZnalezionaGazetka {
   pdf?: string
   /** Ile stron ma wydanie, gdy wiadomo z góry */
   stron?: number
+  /** Okres obowiązywania, np. „20.08 – 22.08” — osobno od nazwy, żeby tytuł
+   *  niósł treść, a nie powtarzał daty */
+  daty?: string
 }
 
 const UA = 'Mozilla/5.0 (compatible; zGazetki/1.0)'
@@ -92,6 +95,34 @@ async function pobierzTekst(url: string): Promise<string> {
     }
     throw e
   }
+}
+
+/** „2026-08-20" → „20.08" */
+function krotkaData(iso?: string): string {
+  const m = String(iso ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return m ? `${m[3]}.${m[2]}` : ""
+}
+
+function okres(od?: string, doo?: string): string | undefined {
+  const a = krotkaData(od)
+  const b = krotkaData(doo)
+  if (!a && !b) return undefined
+  return a && b ? `${a} – ${b}` : a || b
+}
+
+/**
+ * Usuwa z nazwy zwroty o dacie — te trafiają do osobnej kolumny.
+ * „Gazetka ważna od 20.08 do 22.08" → „Gazetka", a „Rewolucja cenowa!" zostaje.
+ */
+function bezDat(nazwa: string): string {
+  const czysta = String(nazwa ?? "")
+    .replace(/wa[żz]n[ay]?\s+od\s+[\d.]+\s*(?:r\.?)?\s*(?:do\s+[\d.]+\s*(?:r\.?)?)?/gi, " ")
+    .replace(/\bod\s+\d{1,2}[.\-]\d{1,2}(?:[.\-]\d{2,4})?/gi, " ")
+    .replace(/\bdo\s+\d{1,2}[.\-]\d{1,2}(?:[.\-]\d{2,4})?/gi, " ")
+    .replace(/[\s–—-]+$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+  return czysta.length >= 3 ? czysta : "Gazetka"
 }
 
 // ---------- Biedronka ----------
@@ -194,7 +225,9 @@ async function lidl(limit: number): Promise<ZnalezionaGazetka[]> {
       if (!pdf) continue
 
       wynik.push({
-        tytul: [f.name, f.title].filter(Boolean).join(" — ") || slug,
+        // Nazwa bez dat; okres idzie osobno, żeby lista dała się czytać wzrokiem
+        tytul: bezDat(f.name || f.title || slug),
+        daty: okres(f.offerStartDate ?? f.startDate, f.offerEndDate ?? f.endDate),
         strona: `https://www.lidl.pl/l/pl/gazetki/${slug}/ar/0`,
         obrazy: [],
         pdf,
@@ -207,6 +240,53 @@ async function lidl(limit: number): Promise<ZnalezionaGazetka[]> {
   return wynik
 }
 
+// ---------- Dino ----------
+
+/**
+ * Dino: lista wydań renderowana serwerowo, z PDF-ami w spłaszczonym payloadzie.
+ *
+ * Payload to jedna wielka tablica, gdzie tytuł, opis z datami i adres PDF-a leżą
+ * blisko siebie, ale bez jawnego powiązania. Wiążemy je po odległości w tekście:
+ * dla każdego PDF-a szukamy wstecz najbliższego opisu „Gazetka aktywna od … do …"
+ * i stojącego przed nim tytułu. Krucha to metoda, ale alternatywą jest parsowanie
+ * całego formatu Nuxta, który zmienia się częściej niż układ tej strony.
+ */
+async function dino(limit: number): Promise<ZnalezionaGazetka[]> {
+  const html = await pobierzTekst('https://marketdino.pl/gazetki/lista/standard')
+
+  // W payloadzie tytuł, data utworzenia i opis z okresem stoją obok siebie:
+  //   "Weekendowe okazje","2026-08-19 00:00:00","Gazetka aktywna od … do …"
+  // Celujemy w cały ten wzorzec naraz, zamiast szukać tytułu po omacku wstecz —
+  // pierwsza wersja łapała tak fragmenty payloadu w rodzaju „:37},132198,".
+  const wpisy = [
+    ...html.matchAll(
+      /"([^"]{4,60})","\d{4}-\d{2}-\d{2}[^"]*","Gazetka aktywna od (\d{4}-\d{2}-\d{2}) do (\d{4}-\d{2}-\d{2})"/g
+    ),
+  ]
+
+  const wynik: ZnalezionaGazetka[] = []
+  for (const w of wpisy.slice(0, limit)) {
+    // PDF wydania leży za jego opisem — bierzemy pierwszy napotkany dalej
+    const dalej = html.slice(w.index ?? 0)
+    const pdf = dalej.match(/https:\/\/[^"\s]+\.pdf/i)?.[0]
+    if (!pdf) continue
+
+    // Payload bywa poprzestawiany i w miejscu tytułu trafia się znacznik czasu
+    // albo goła liczba — wtedy lepsza jest nazwa ogólna niż „2026-08-25 22:30:00"
+    const surowy = w[1]
+    const sensowny = !/^[\d\s:.\-]+$/.test(surowy) && /[a-ząćęłńóśźż]/i.test(surowy)
+
+    wynik.push({
+      tytul: sensowny ? bezDat(surowy) : "Gazetka Dino",
+      strona: pdf,
+      obrazy: [],
+      pdf,
+      daty: okres(w[2], w[3]),
+    })
+  }
+  return wynik
+}
+
 // ---------- Rejestr ----------
 
 type Zrodlo = (limit: number) => Promise<ZnalezionaGazetka[]>
@@ -214,6 +294,7 @@ type Zrodlo = (limit: number) => Promise<ZnalezionaGazetka[]>
 const ZRODLA: Record<string, Zrodlo> = {
   biedronka,
   lidl,
+  dino,
   // Kaufland odpada: mimo wspólnej z Lidlem infrastruktury Schwarz Group jego
   // własny serwis odrzuca żądania serwerowe (HTTP 403). Obchodzenie tego to już
   // ukrywanie się przed blokadą, więc dla Kauflandu zostaje ręczne wklejenie adresu.
