@@ -49,7 +49,7 @@ export function Header() {
             konturami, więc problem znika, a znak jest dokładnie taki jak w źródle. */}
         <Link href="/" aria-label="zGazetki — strona główna" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="zGazetki" className="h-6 sm:h-8 w-auto" />
+          <img src="/logo.svg" alt="zGazetki" className="h-5 sm:h-7 w-auto" />
         </Link>
 
         {/* Zeszło tu z hero na stronie głównej. Na telefonie ciaśniej i mniejszym
