@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { pickDistinctDishes, type SlotTag } from '@/lib/popularDishes'
-import { Loader2, ScanLine, Save, Sparkles, Trash2, ExternalLink, Archive } from 'lucide-react'
+import { Loader2, ScanLine, Save, Sparkles, Trash2, ExternalLink, Archive, Link2 } from 'lucide-react'
 import type { Store } from '@/types'
 
 type ConditionType = 'brak' | 'karta' | 'wielosztuka' | 'inny'
@@ -155,6 +155,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const [savedMsg, setSavedMsg] = useState('')
 
   const [theme, setTheme] = useState('')
+  const [adresGazetki, setAdresGazetki] = useState('')
   const [generating, setGenerating] = useState(false)
   const [batchStatus, setBatchStatus] = useState('')
   const [drafts, setDrafts] = useState<{ id: string; title: string; editUrl: string; hasImage?: boolean }[]>([])
@@ -250,10 +251,48 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    e.target.value = '' // pozwala wgrać ten sam plik drugi raz
+    if (file) await przetworzPlik(file)
+  }
+
+  // Pobiera gazetkę spod adresu i wpuszcza ją w tę samą ścieżkę co plik z dysku.
+  // Bez adapterów per sieć: adres wkleja człowiek, więc przebudowa strony sklepu
+  // niczego nie psuje — wklejasz nowy link zamiast czekać na poprawkę w kodzie.
+  const pobierzZAdresu = async () => {
+    const adres = adresGazetki.trim()
+    if (!adres) return
+    setExtracting(true)
+    setError('')
+    setSavedMsg('')
+    setProgress('Pobieram plik ze strony sklepu…')
+    try {
+      const res = await fetch('/api/pobierz-gazetke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: adres }),
+      })
+      if (!res.ok) {
+        const dane = await res.json().catch(() => ({}))
+        throw new Error(dane?.error ?? `Błąd ${res.status}`)
+      }
+      const typ = res.headers.get('content-type') ?? 'application/pdf'
+      const blob = await res.blob()
+      const nazwa = typ.includes('pdf') ? 'gazetka.pdf' : 'gazetka.jpg'
+      setExtracting(false)
+      await przetworzPlik(new File([blob], nazwa, { type: typ }))
+      setAdresGazetki('')
+    } catch (e: any) {
+      setExtracting(false)
+      setProgress('')
+      setError(e?.message ?? 'Nie udało się pobrać pliku.')
+    }
+  }
+
+  // Wspólna ścieżka dla pliku z dysku i pliku pobranego po adresie — dalej wszystko
+  // dzieje się tak samo: pdf.js rozkłada strony, paczki lecą do odczytu.
+  const przetworzPlik = async (file: File) => {
     if (file.size > 100 * 1024 * 1024) {
       setError('Plik za duży (maks. 100 MB).')
-      e.target.value = ''
       return
     }
 
@@ -371,7 +410,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     } finally {
       setExtracting(false)
       setProgress('')
-      e.target.value = ''
+      /* input czyszczony jest w onFile, tu nie ma już zdarzenia */
     }
   }
 
@@ -614,6 +653,29 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
             {extracting ? 'Odczytuję...' : 'Wgraj zdjęcie / PDF gazetki'}
             <input type="file" accept="image/*,application/pdf" className="hidden" onChange={onFile} disabled={extracting} />
           </label>
+
+          {/* Wklejenie adresu oszczędza pobieranie pliku na dysk i szukanie go w oknie wyboru */}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="url"
+              inputMode="url"
+              value={adresGazetki}
+              onChange={(e) => setAdresGazetki(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') pobierzZAdresu() }}
+              placeholder="albo wklej adres PDF-a gazetki ze strony sklepu"
+              disabled={extracting}
+              className="flex-1 min-w-0 rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={pobierzZAdresu}
+              disabled={extracting || !adresGazetki.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:border-stone-300 disabled:opacity-50"
+            >
+              <Link2 className="w-4 h-4" />
+              Pobierz
+            </button>
+          </div>
 
           {/* Zapisane wcześniej promocje tego sklepu — generuj z nich także w innej sesji */}
           {savedCount != null && savedCount > 0 && (
