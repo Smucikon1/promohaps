@@ -30,7 +30,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const gazetki = await znajdzGazetki(storeSlug, 6)
+    // Limit 6 gubil wydania po cichu: Biedronka wystawia kilkanascie pozycji naraz,
+    // po odsianiu niespozywczych zostaje ich okolo siedmiu, a siodme wypadalo poza
+    // liste i nie bylo wiadomo dlaczego. To sa zwykle pobrania HTML, nie wywolania AI,
+    // wiec wyzszy limit kosztuje sekundy, a nie pieniadze.
+    const gazetki = await znajdzGazetki(storeSlug, 12)
 
     // Które wydania już wciągnęliśmy — sprawdzamy po źródłowym adresie
     const { data: sklep } = await supabase.from('stores').select('id').eq('slug', storeSlug).maybeSingle()
