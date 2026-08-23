@@ -26,6 +26,14 @@ export interface DraftInput {
    * Lepiej zapisać przepis bez zdjęcia niż stracić go w całości przy ubiciu funkcji.
    */
   imageDeadline?: number
+  /**
+   * Pomija generowanie zdjęcia w tym żądaniu i oddaje sam prompt.
+   *
+   * Sama generacja tekstu zajmuje ponad 40 s, a Vercel ubija funkcję po 60 —
+   * doklejone zdjęcie regularnie przekraczało budżet. Klient dogrywa je osobnym
+   * żądaniem przez /api/generate-image, więc każde ma własne 60 s.
+   */
+  skipImage?: boolean
 }
 
 export interface DraftResult {
@@ -36,6 +44,9 @@ export interface DraftResult {
   usedProducts: string[]
   hasImage: boolean
   imageWarning: string | null
+  /** Angielski prompt z generatora — do dogrania zdjęcia osobnym żądaniem.
+   *  Nigdzie go nie zapisujemy, więc bez przekazania go dalej przepada. */
+  imagePrompt: string | null
 }
 
 export class DraftError extends Error {
@@ -92,7 +103,9 @@ export async function createRecipeDraft(supabase: any, input: DraftInput): Promi
 
   // Zdjęcie generujemy przed zapisem, żeby przepis od razu trafił do bazy kompletny.
   // Porażka nie przerywa niczego — przepis powstaje bez zdjęcia, a admin dostaje ostrzeżenie.
-  const pozaCzasem = input.imageDeadline != null && Date.now() > input.imageDeadline
+  const pozaCzasem =
+    input.skipImage === true ||
+    (input.imageDeadline != null && Date.now() > input.imageDeadline)
   const image = pozaCzasem
     ? { url: null as string | null, warning: 'Pominięto zdjęcie — zabrakło czasu w zadaniu cyklicznym.' }
     : await generateRecipeImage(recipe.image_prompt ?? '', slug, supabase)
@@ -184,5 +197,6 @@ export async function createRecipeDraft(supabase: any, input: DraftInput): Promi
     usedProducts: promos.map((p: any) => p.name).filter(Boolean),
     hasImage: !!image.url,
     imageWarning: image.warning ?? null,
+    imagePrompt: recipe.image_prompt ?? null,
   }
 }

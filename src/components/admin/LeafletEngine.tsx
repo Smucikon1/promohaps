@@ -641,10 +641,30 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     const isJson = res.headers.get('content-type')?.includes('application/json')
     const data = isJson ? await res.json().catch(() => ({})) : {}
     if (!res.ok) throw new Error(data.error ?? (res.status === 504 ? 'Timeout serwera — spróbuj ponownie.' : `Błąd (${res.status}).`))
+    // Zdjęcie osobnym żądaniem: generacja tekstu zjada ponad 40 s z 60-sekundowego
+    // budżetu Vercela, więc razem regularnie się nie mieściły. Nieudane zdjęcie
+    // nie kosztuje już przepisu — zostaje szkic bez fotografii, do uzupełnienia.
+    let maZdjecie = !!data.hasImage
+    let ostrzezenieZdjecia: string | undefined = data.imageWarning ?? undefined
+    if (!maZdjecie && data.recipeId) {
+      try {
+        const imgRes = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipeId: data.recipeId, prompt: data.imagePrompt }),
+        })
+        const imgDane = await imgRes.json().catch(() => ({}))
+        maZdjecie = !!imgDane?.hasImage
+        if (!maZdjecie) ostrzezenieZdjecia = imgDane?.error ?? undefined
+      } catch {
+        ostrzezenieZdjecia = "Nie udało się dograć zdjęcia."
+      }
+    }
+
     return {
-      draft: { id: data.recipeId, title: data.title, editUrl: data.editUrl, hasImage: !!data.hasImage },
+      draft: { id: data.recipeId, title: data.title, editUrl: data.editUrl, hasImage: maZdjecie },
       used: Array.from(new Set([...used, ...(data.usedProducts ?? [])])),
-      imageWarning: data.imageWarning ?? undefined,
+      imageWarning: ostrzezenieZdjecia,
     }
   }
 

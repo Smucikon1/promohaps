@@ -34,6 +34,8 @@ export async function POST(request: Request) {
       promoProducts: body.promoProducts,
       reuseProducts: body.reuseProducts,
       extraAvoidTitles: Array.isArray(body.extraAvoidTitles) ? body.extraAvoidTitles : [],
+      // Zdjęcie dogrywa klient osobnym żądaniem — patrz komentarz przy skipImage
+      skipImage: body.skipImage !== false,
     })
     return NextResponse.json(wynik)
   } catch (e: any) {
