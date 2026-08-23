@@ -90,6 +90,12 @@ const SET_SPECS: SetSpec[] = [
 const MAX_EDGE = 1600 // dłuższy bok strony/obrazu po przeskalowaniu
 // Poniżej tej ceny promocja jest niewiarygodna (błąd odczytu) — nie zapisujemy jej ani nie używamy w przepisach
 const MIN_PRICE = 0.3
+// Po tylu stronach bez ani jednego produktu spożywczego uznajemy, że to nie jest
+// gazetka z jedzeniem. Nazwy nic nie zdradzają („Hity i inspiracje", „BIEK"),
+// a metadanych Biedronka nie podaje — więc rozstrzyga treść, nie tytuł.
+// Sześć stron, bo pierwsze bywają okładką i stroną redakcyjną bez cen.
+const STRON_NA_ROZPOZNANIE = 6
+
 const PAGES_PER_REQUEST = 1 // jedna strona na żądanie — mniejsze ciało, mniej błędów sieci
 
 function canvasToBase64(canvas: HTMLCanvasElement): PageImage {
@@ -356,7 +362,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
       }
       if (strony.length === 0) throw new Error('Nie udało się pobrać żadnej strony.')
       setExtracting(false)
-      await przetworzStrony(strony, dopisz)
+      // true: przy automatycznym wczytywaniu odsiewamy gazetki bez jedzenia.
+      // Przy ręcznym wgraniu pliku tego nie robimy — skoro wskazałeś plik, czytamy go.
+      await przetworzStrony(strony, dopisz, true)
       await generujKomplet()
     } catch (e: any) {
       setExtracting(false)
@@ -452,7 +460,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   }
 
   // Odczyt gotowych stron — wspólne dla pliku, PDF-a i gazetki pobranej ze strony sieci
-  const przetworzStrony = async (pages: PageImage[], dopisz = false) => {
+  const przetworzStrony = async (pages: PageImage[], dopisz = false, przerwijGdyPusto = false) => {
     // Przy wczytywaniu kilku gazetek pod rząd startujemy od tego, co już mamy
     const bazowe = dopisz ? products : []
     setExtracting(true)
@@ -499,6 +507,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
       let failedPages = 0
 
       const errorSample: string[] = []
+      let niespozywcza = false
       for (let b = 0; b < batches; b++) {
         const slice = pages.slice(b * PAGES_PER_REQUEST, (b + 1) * PAGES_PER_REQUEST)
         setProgress(`Odczytuję promocje: strona ${b + 1}/${batches}`)
@@ -511,6 +520,13 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
             merged.push(p)
           }
           setProducts(scal(bazowe, merged)) // pokazuj wyniki na bieżąco
+
+          // Gazetka niespożywcza: przerywamy po kilku stronach zamiast mielić
+          // czterdzieści i płacić za każdą wysłaną do modelu.
+          if (przerwijGdyPusto && merged.length === 0 && b + 1 >= STRON_NA_ROZPOZNANIE) {
+            niespozywcza = true
+            break
+          }
         } catch (err: any) {
           // Jedna strona padła — nie przerywamy całości, lecimy dalej.
           // Logujemy pierwsze 3 błędy do konsoli, żeby użytkownik/dev widział przyczynę.
@@ -523,6 +539,11 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         }
       }
 
+      if (niespozywcza) {
+        throw new Error(
+          `Pominięto — na pierwszych ${STRON_NA_ROZPOZNANIE} stronach nie ma produktów spożywczych.`
+        )
+      }
       if (merged.length === 0) {
         throw new Error(
           failedPages > 0
