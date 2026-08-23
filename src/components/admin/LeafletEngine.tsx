@@ -271,6 +271,24 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
 
   // Pyta stronę sieci o listę aktualnych wydań. Biedronka trzyma je pod własnym
   // API gazetek, więc nie potrzeba ani agregatora, ani szukania PDF-a ręcznie.
+  /**
+   * Łączy produkty z kilku gazetek w jedną listę.
+   *
+   * Sieci wypuszczają po kilka wydań naraz i te same produkty potrafią wystąpić
+   * w dwóch — przy powtórce zostawiamy tańszą cenę, bo to ona jest tą, którą
+   * realnie zapłacisz, a droższa i tak byłaby ignorowana przy kasie.
+   */
+  const scal = (a: Product[], b: Product[]): Product[] => {
+    const mapa = new Map<string, Product>()
+    for (const p of [...a, ...b]) {
+      const k = normName(p.name).replace(/\s+/g, ' ').trim()
+      if (!k) continue
+      const stary = mapa.get(k)
+      if (!stary || (p.price_promo ?? Infinity) < (stary.price_promo ?? Infinity)) mapa.set(k, p)
+    }
+    return [...mapa.values()]
+  }
+
   const sprawdzGazetki = async () => {
     setSzukam(true)
     setError('')
@@ -292,11 +310,12 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   }
 
   // Ściąga strony wybranego wydania i wpuszcza je w zwykły odczyt
-  const wczytajZnaleziona = async (g: any) => {
+  const wczytajZnaleziona = async (g: any, dopisz = false) => {
     setExtracting(true)
     setError('')
     setSavedMsg('')
-    setProducts([])
+    // Przy laczeniu kilku gazetek nie kasujemy tego, co juz odczytane
+    if (!dopisz) setProducts([])
     try {
       // Lidl oddaje gotowy PDF całego wydania, Biedronka — osobne obrazy stron.
       // PDF jest lepszy: jedno pobranie zamiast kilkudziesięciu i pewny układ strony.
@@ -337,8 +356,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
       }
       if (strony.length === 0) throw new Error('Nie udało się pobrać żadnej strony.')
       setExtracting(false)
-      await przetworzStrony(strony)
-      setDostepne(null)
+      await przetworzStrony(strony, dopisz)
       await generujKomplet()
     } catch (e: any) {
       setExtracting(false)
@@ -434,7 +452,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   }
 
   // Odczyt gotowych stron — wspólne dla pliku, PDF-a i gazetki pobranej ze strony sieci
-  const przetworzStrony = async (pages: PageImage[]) => {
+  const przetworzStrony = async (pages: PageImage[], dopisz = false) => {
+    // Przy wczytywaniu kilku gazetek pod rząd startujemy od tego, co już mamy
+    const bazowe = dopisz ? products : []
     setExtracting(true)
     try {
       // 2) Wysyłka partiami — omija limit rozmiaru żądania.
@@ -490,7 +510,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
             seen.add(key)
             merged.push(p)
           }
-          setProducts([...merged]) // pokazuj wyniki na bieżąco
+          setProducts(scal(bazowe, merged)) // pokazuj wyniki na bieżąco
         } catch (err: any) {
           // Jedna strona padła — nie przerywamy całości, lecimy dalej.
           // Logujemy pierwsze 3 błędy do konsoli, żeby użytkownik/dev widział przyczynę.
@@ -652,15 +672,90 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
    * inaczej trzydzieści równoległych wywołań wyprodukowałoby trzydzieści wariantów
    * tego samego dania.
    */
-  const generujKomplet = async () => {
+  /**
+   * Cała droga jednym kliknięciem: wykrycie wydań → odczyt wszystkich naraz →
+   * zapis promocji → pakiet 30 szkiców.
+   *
+   * Orkiestracja siedzi w przeglądarce, a nie na serwerze, bo Vercel ubija funkcję
+   * po 60 sekundach, a sam odczyt kilku gazetek to grubo więcej. Karta może pracować
+   * dowolnie długo i pokazywać postęp — serwer dostaje wiele krótkich żądań.
+   */
+  const zrobWszystko = async () => {
+    setError('')
+    setSavedMsg('')
+    setProducts([])
+
+    // 1) Które wydania są aktualne
+    setEtap({ nazwa: 'Szukam nowych gazetek', nr: 1, z: 4 })
+    let lista: any[] = []
+    try {
+      const res = await fetch('/api/gazetki-dostepne', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeSlug }),
+      })
+      const dane = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(dane?.error ?? `Błąd ${res.status}`)
+      lista = dane.gazetki ?? []
+    } catch (e: any) {
+      setEtap(null)
+      setError(e?.message ?? 'Nie udało się sprawdzić gazetek.')
+      return
+    }
+
+    // Już wciągnięte pomijamy — po co płacić za odczyt tego samego drugi raz
+    const doWczytania = lista.filter((g: any) => !g.wciagnieta)
+    if (doWczytania.length === 0) {
+      setEtap(null)
+      setDostepne(lista)
+      setSavedMsg('Wszystkie aktualne gazetki tego sklepu są już wczytane.')
+      return
+    }
+
+    // 2) Odczyt wszystkich naraz — produkty scalają się w jedną listę
+    let udane = 0
+    for (let i = 0; i < doWczytania.length; i++) {
+      const g = doWczytania[i]
+      setEtap({
+        nazwa: `Czytam gazetkę ${i + 1}/${doWczytania.length}: ${g.tytul}`,
+        nr: 2,
+        z: 4,
+      })
+      try {
+        await wczytajZnaleziona(g, i > 0)
+        udane++
+      } catch {
+        // Jedna nieudana gazetka nie może zabrać pozostałych
+      }
+    }
+
+    if (udane === 0) {
+      setEtap(null)
+      setError('Nie udało się odczytać żadnej gazetki.')
+      return
+    }
+
+    // 3) i 4) Zapis promocji plus pakiet szkiców
+    await generujKomplet(2)
+    setDostepne(null)
+  }
+
+  const generujKomplet = async (odKroku = 0) => {
     const kroki = [
       { nazwa: 'Zapisuję promocje', fn: savePromos },
       { nazwa: 'Klasyki — pierwsza dziewiątka', fn: generateClassicSet },
       { nazwa: 'Klasyki — druga dziewiątka', fn: generateClassicSet },
       { nazwa: 'Zestaw pod filtry serwisu', fn: generateSet },
     ]
+    // odKroku > 0 znaczy, że jesteśmy w środku większego przebiegu i numerację
+    // etapów prowadzi on — inaczej licznik skakałby użytkownikowi przed oczami
+    const wCalosci = odKroku > 0
     for (let i = 0; i < kroki.length; i++) {
-      setEtap({ nazwa: kroki[i].nazwa, nr: i + 1, z: kroki.length })
+      setEtap(
+        wCalosci
+          ? { nazwa: kroki[i].nazwa, nr: i === 0 ? 3 : 4, z: 4 }
+          : { nazwa: kroki[i].nazwa, nr: i + 1, z: kroki.length }
+      )
       try {
         await kroki[i].fn()
       } catch {
@@ -845,6 +940,23 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
               Otwórz gazetki tego sklepu
             </a>
           )}
+
+          {/* Cała droga jednym kliknięciem. Osobny, mocniejszy przycisk niż reszta,
+              bo to jest teraz domyślna czynność — pozostałe zostają dla przypadków,
+              gdy chcesz zrobić tylko wycinek. */}
+          <button
+            type="button"
+            onClick={zrobWszystko}
+            disabled={extracting || generating || szukam || !!etap}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#12b76a] px-5 py-3.5 text-base font-bold text-white transition-colors hover:bg-[#0ea25d] disabled:opacity-50 sm:w-auto"
+          >
+            {etap ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+            {etap ? 'Pracuję…' : 'Wczytaj gazetki i zrób przepisy'}
+          </button>
+          <p className="mt-1.5 text-xs text-stone-500">
+            Znajduje aktualne gazetki, czyta wszystkie naraz, zapisuje promocje
+            i generuje 30 szkiców. Zajmuje kilkanaście minut — możesz zostawić kartę otwartą.
+          </p>
 
           {/* Wykrywanie wydań wprost ze strony sieci — bez szukania i wklejania */}
           <button
@@ -1087,7 +1199,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
               Zestaw 9 klasyków
             </button>
             <button
-              onClick={generujKomplet}
+              onClick={() => generujKomplet()}
               disabled={generating || products.length === 0}
               title="Zapis promocji i 30 szkiców: dwa razy 9 klasyków plus 12 pod filtry"
               className="inline-flex items-center gap-2 rounded-xl border border-[#12b76a] bg-white px-4 py-2.5 text-sm font-semibold text-[#0c7d49] hover:bg-[#e6f9f0] disabled:opacity-50"
