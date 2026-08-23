@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { RecipeBulkTable } from '@/components/admin/RecipeBulkTable'
+import { expiredRecipeIds } from '@/lib/promoVisibility'
 import { Plus, ImageOff } from 'lucide-react'
 
 interface Props {
@@ -19,6 +20,14 @@ export default async function AdminRecipesPage({ searchParams }: Props) {
   const recipes = all ?? []
   const drafts = recipes.filter((r: any) => !r.is_published)
   const published = recipes.filter((r: any) => r.is_published)
+
+  // „Opublikowany" to nie to samo co „widoczny w serwisie". Katalog ukrywa przepis,
+  // gdy KTÓRAKOLWIEK jego promocja wygaśnie — sama strona przepisu zostaje, ale
+  // z list znika. Bez tego rozróżnienia panel pokazywał trzydzieści opublikowanych
+  // przepisów, z których połowy nikt nie mógł znaleźć.
+  const wygasle = new Set(await expiredRecipeIds())
+  const online = published.filter((r: any) => !wygasle.has(r.id))
+  const zeszly = published.filter((r: any) => wygasle.has(r.id))
   // Generator zapisuje pusty string, gdy zdjęcie się nie udało; ręcznie dodany
   // przepis zostawia null — do eksportu łapiemy oba przypadki.
   const bezZdjecia = recipes.filter((r: any) => !r.image_url)
@@ -26,14 +35,34 @@ export default async function AdminRecipesPage({ searchParams }: Props) {
   // Domyslnie pokazujemy szkice, a nie wszystko naraz. Opublikowane przepisy sa
   // gotowe i nie wymagaja juz uwagi - mieszanie ich z kolejka do akceptacji
   // sprawialo, ze przy kilkudziesieciu pozycjach nie bylo widac, co zostalo do zrobienia.
-  const view = status === 'all' ? recipes : status === 'published' ? published : drafts
+  const view =
+    status === 'all'
+      ? recipes
+      : status === 'online'
+        ? online
+        : status === 'expired'
+          ? zeszly
+          : status === 'published'
+            ? published
+            : drafts
 
   const tabs = [
     { key: 'draft', label: 'Szkice', count: drafts.length, href: '/admin/przepisy' },
+    { key: 'online', label: 'Online', count: online.length, href: '/admin/przepisy?status=online' },
+    { key: 'expired', label: 'Zeszły z serwisu', count: zeszly.length, href: '/admin/przepisy?status=expired' },
     { key: 'published', label: 'Opublikowane', count: published.length, href: '/admin/przepisy?status=published' },
     { key: 'all', label: 'Wszystkie', count: recipes.length, href: '/admin/przepisy?status=all' },
   ]
-  const activeKey = status === 'all' ? 'all' : status === 'published' ? 'published' : 'draft'
+  const activeKey =
+    status === 'all'
+      ? 'all'
+      : status === 'online'
+        ? 'online'
+        : status === 'expired'
+          ? 'expired'
+          : status === 'published'
+            ? 'published'
+            : 'draft'
 
   return (
     <div>
@@ -103,7 +132,7 @@ export default async function AdminRecipesPage({ searchParams }: Props) {
       ) : (
         // key = zakładka: przełączenie filtra czyści zaznaczenie, żeby akcja zbiorcza
         // nie objęła przepisów, których użytkownik już nie widzi na ekranie
-        <RecipeBulkTable key={activeKey} recipes={view} />
+        <RecipeBulkTable key={activeKey} recipes={view} wygasle={wygasle} />
       )}
     </div>
   )

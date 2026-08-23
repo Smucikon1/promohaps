@@ -12,7 +12,18 @@ import { Edit, Loader2, Check, EyeOff, Trash2, X } from 'lucide-react'
 
 type BulkAction = 'publish' | 'unpublish' | 'delete'
 
-export function RecipeBulkTable({ recipes }: { recipes: any[] }) {
+/**
+ * @param wygasle Identyfikatory przepisów, które mimo publikacji nie są widoczne
+ *   w serwisie, bo wygasła im promocja. Oznaczamy je, żeby nie szukać przyczyny
+ *   „dlaczego tego przepisu nie widać" po stronie użytkownika.
+ */
+export function RecipeBulkTable({
+  recipes,
+  wygasle,
+}: {
+  recipes: any[]
+  wygasle?: Set<string>
+}) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<BulkAction | null>(null)
@@ -116,6 +127,14 @@ export function RecipeBulkTable({ recipes }: { recipes: any[] }) {
                   </td>
                   <td className="px-1 py-3.5">
                     <p className="font-medium text-stone-800 line-clamp-1">{recipe.title}</p>
+                    {/* Opublikowany, ale niewidoczny w katalogu — wygasla promocja.
+                        Bez tego znacznika jedyna droga do tej informacji to szukanie
+                        przepisu w serwisie i dziwienie sie, ze go nie ma. */}
+                    {wygasle?.has(recipe.id) && recipe.is_published && (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                        zeszedl z serwisu — promocja wygasla
+                      </span>
+                    )}
                     <p className="text-xs text-stone-400 mt-0.5">{recipe.slug}</p>
                   </td>
                   <td className="px-4 py-3.5 hidden md:table-cell">
