@@ -132,6 +132,35 @@ function bezDat(nazwa: string): string {
   return czysta.length >= 3 ? czysta : "Gazetka"
 }
 
+// ---------- Biedronka: starsza przeglądarka (flexpaper) ----------
+
+/**
+ * Część wydań Biedronki nie używa nowego API gazetek, tylko starszej przeglądarki
+ * opartej na PDF-ie. Wychodzi to na jaw dopiero przy konkretnym wydaniu — „Gang
+ * Zaradniaków" był po cichu pomijany, bo kod szukał wyłącznie galleryLeaflet.init.
+ *
+ * Adresy stron składamy sami ze wzorca; liczbę stron podaje wariant format=json.
+ * resolution=200 daje wersję czytelną dla odczytu — domyślna jest za miękka na ceny.
+ */
+function flexpaperUrl(doc: string, opcje: string): string {
+  const podfolder = encodeURIComponent(`_cache/${doc}/`)
+  return `https://www.biedronka.pl/flexpaper/view?subfolder=${podfolder}&doc=${doc}.pdf&${opcje}`
+}
+
+async function stronyZFlexpaper(html: string): Promise<string[]> {
+  const doc = html.match(/([A-Za-z0-9]{16,32})\.pdf/)?.[1]
+  if (!doc) return []
+  try {
+    const meta = JSON.parse(await pobierzTekst(flexpaperUrl(doc, 'format=json&page=1')))
+    // Każdy wpis niesie łączną liczbę stron w polu pages
+    const ile = Number(meta?.[0]?.pages ?? (Array.isArray(meta) ? meta.length : 0))
+    if (!ile || ile > 200) return []
+    return Array.from({ length: ile }, (_, i) => flexpaperUrl(doc, `format=jpg&page=${i + 1}&resolution=200`))
+  } catch {
+    return []
+  }
+}
+
 // ---------- Biedronka ----------
 
 /**
@@ -156,9 +185,19 @@ async function biedronka(limit: number): Promise<ZnalezionaGazetka[]> {
     try {
       const html = await pobierzTekst(strona)
 
-      // window.galleryLeaflet.init("<uuid>")
+      const tytulStrony =
+        html.match(/<title>([^<]+)<\/title>/i)?.[1]?.replace(/\s*-\s*Gazetka.*$/i, '').trim() ?? strona
+
+      // window.galleryLeaflet.init("<uuid>") — nowsza przeglądarka
       const uuid = html.match(/galleryLeaflet\.init\(\s*["']([0-9a-f-]{36})["']/i)?.[1]
-      if (!uuid) continue
+      if (!uuid) {
+        // Starsza przeglądarka — inny mechanizm, ta sama wartość dla nas
+        const zFlexpaper = await stronyZFlexpaper(html)
+        if (zFlexpaper.length > 0) {
+          wynik.push({ tytul: tytulStrony, strona, obrazy: zFlexpaper })
+        }
+        continue
+      }
 
       const tytul =
         html.match(/<title>([^<]+)<\/title>/i)?.[1]?.replace(/\s*-\s*Gazetka.*$/i, '').trim() ??
