@@ -35,7 +35,10 @@ export async function POST(request: Request) {
   if (error || !recipe) {
     return NextResponse.json({ error: 'Nie znaleziono przepisu.' }, { status: 404 })
   }
-  if (recipe.image_url) {
+  // Domyślnie nie ruszamy przepisu, który zdjęcie już ma — automat wołający tę
+  // trasę po każdym szkicu nie powinien nadpisywać cudzej pracy. Przycisk
+  // w formularzu podaje force, bo tam podmiana jest właśnie tym, o co prosisz.
+  if (recipe.image_url && body?.force !== true) {
     return NextResponse.json({ hasImage: true, pominiete: 'przepis ma już zdjęcie' })
   }
 

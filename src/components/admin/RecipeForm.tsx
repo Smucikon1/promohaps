@@ -4,7 +4,7 @@ import { revalidateCatalog } from '@/app/actions/revalidate'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Plus, Trash2, Upload, X } from 'lucide-react'
+import { Loader2, Plus, Trash2, Upload, X, Sparkles } from 'lucide-react'
 import type { Store, Category } from '@/types'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { cn } from '@/lib/utils'
@@ -42,6 +42,8 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
   const [slug, setSlug] = useState(seed?.slug ?? '')
   const [description, setDescription] = useState(seed?.description ?? '')
   const [imageUrl, setImageUrl] = useState(seed?.image_url ?? '')
+  const [generujeZdjecie, setGenerujeZdjecie] = useState(false)
+  const [bladZdjecia, setBladZdjecia] = useState('')
   const [storeId, setStoreId] = useState(seed?.store_id ?? '')
   const [selectedCategories, setSelectedCategories] = useState<string[]>(seed?.category_ids ?? [])
   const [prepTime, setPrepTime] = useState(seed?.prep_time_min?.toString() ?? '')
@@ -212,6 +214,34 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
     router.refresh()
   }
 
+  /**
+   * Dogrywa zdjęcie przez Replicate i wstawia adres w pole formularza.
+   *
+   * Wymaga zapisanego przepisu, bo trasa pracuje na jego identyfikatorze i sama
+   * zapisuje wynik do bazy — dlatego przy nowym przepisie przycisk jest wyłączony.
+   */
+  const generujZdjecie = async () => {
+    if (!recipe?.id) return
+    setGenerujeZdjecie(true)
+    setBladZdjecia('')
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipeId: recipe.id, force: true }),
+      })
+      const dane = await res.json().catch(() => ({}))
+      if (!res.ok || !dane?.imageUrl) {
+        throw new Error(dane?.error ?? `Błąd ${res.status}`)
+      }
+      setImageUrl(dane.imageUrl)
+    } catch (e: any) {
+      setBladZdjecia(e?.message ?? 'Nie udało się wygenerować zdjęcia.')
+    } finally {
+      setGenerujeZdjecie(false)
+    }
+  }
+
   const inputClass = 'w-full px-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 bg-white'
   const labelClass = 'block text-sm font-medium text-stone-700 mb-1.5'
   const sectionClass = 'bg-white rounded-2xl border border-stone-100 p-6 space-y-4'
@@ -253,8 +283,20 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
           <label htmlFor="rf-image-url" className={labelClass}>URL zdjęcia</label>
           <input id="rf-image-url" className={inputClass} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-stone-500">lub</span>
+          {/* Generowanie działa na zapisanym przepisie — trasa potrzebuje jego
+              identyfikatora i sama dopisuje wynik do bazy. */}
+          <button
+            type="button"
+            onClick={generujZdjecie}
+            disabled={generujeZdjecie || !recipe?.id}
+            title={recipe?.id ? undefined : 'Najpierw zapisz przepis'}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#12b76a] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0ea25d] disabled:opacity-50"
+          >
+            <Sparkles className={`w-4 h-4 ${generujeZdjecie ? 'animate-pulse' : ''}`} />
+            {generujeZdjecie ? 'Generuję zdjęcie…' : 'Wygeneruj AI'}
+          </button>
           <label className="cursor-pointer flex items-center gap-2 btn-outline text-sm">
             <Upload className="w-4 h-4" />
             {imageUploading ? 'Wgrywanie...' : 'Prześlij zdjęcie'}
@@ -262,6 +304,10 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
           </label>
           <span className="text-xs text-stone-400">PNG, JPG, WEBP · maks. 5 MB</span>
         </div>
+        {bladZdjecia && (
+          <p className="rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{bladZdjecia}</p>
+        )}
+
         {imageUrl && (
           <div className="relative w-full max-w-xs">
             {/* eslint-disable-next-line @next/next/no-img-element */}
