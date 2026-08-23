@@ -24,6 +24,9 @@ export interface ZnalezionaGazetka {
   /** Okres obowiązywania, np. „20.08 – 22.08” — osobno od nazwy, żeby tytuł
    *  niósł treść, a nie powtarzał daty */
   daty?: string
+  /** Czy wydanie jest spożywcze według SAMEJ SIECI (z adresu plików).
+   *  undefined = sieć nie oznaczyła, trzeba rozstrzygnąć treścią. */
+  spozywcza?: boolean
 }
 
 // Ujednolica polskie znaki. Trzy linijki na miejscu zamiast zaleznosci od modulu
@@ -132,6 +135,23 @@ function bezDat(nazwa: string): string {
   return czysta.length >= 3 ? czysta : "Gazetka"
 }
 
+/**
+ * Odczytuje klasyfikację wydania z adresu jego plików.
+ *
+ * Biedronka układa obrazy w katalogach 2026_FOOD i 2026_NONFOOD — czyli sama
+ * mówi, co jest spożywcze, tylko trzeba to przeczytać. To pewniejsze i tańsze
+ * niż zgadywanie po tytule („Hity i inspiracje" nie zdradza niczego) i niż
+ * czytanie kilku stron modelem, żeby dojść do tego samego wniosku.
+ *
+ * NONFOOD sprawdzamy pierwszy, bo zawiera w sobie słowo FOOD.
+ */
+function znacznikTresci(url: string): boolean | undefined {
+  if (!url) return undefined
+  if (/nonfood|_nf_/i.test(url)) return false
+  if (/_food|\/food/i.test(url)) return true
+  return undefined
+}
+
 // ---------- Biedronka: starsza przeglądarka (flexpaper) ----------
 
 /**
@@ -223,7 +243,9 @@ async function biedronka(limit: number): Promise<ZnalezionaGazetka[]> {
             .find((u: unknown) => typeof u === 'string' && /^https?:\/\//.test(u))
         })
         .filter(Boolean) as string[]
-      if (obrazy.length > 0) wynik.push({ tytul, strona, obrazy })
+      if (obrazy.length > 0) {
+        wynik.push({ tytul, strona, obrazy, spozywcza: znacznikTresci(obrazy[0]) })
+      }
     } catch {
       // Jedno wydanie, którego nie da się odczytać, nie może zabrać reszty
     }
@@ -430,5 +452,13 @@ export async function znajdzGazetki(storeSlug: string, limit = 5): Promise<Znale
   if (!zrodlo) return []
   // Pobieramy z zapasem, bo część wydań odpadnie jako niespożywcza
   const wszystkie = await zrodlo(limit * 3)
-  return wszystkie.filter((g) => czySpozywcza(g.tytul)).slice(0, limit)
+  return wszystkie
+    .filter((g) => {
+      // Klasyfikacja sieci jest rozstrzygająca — i w jedną, i w drugą stronę.
+      // Gdy sieć mówi FOOD, nie odrzucamy wydania przez zbieg słów w tytule.
+      if (g.spozywcza === false) return false
+      if (g.spozywcza === true) return true
+      return czySpozywcza(g.tytul)
+    })
+    .slice(0, limit)
 }

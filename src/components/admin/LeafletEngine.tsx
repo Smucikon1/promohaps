@@ -90,11 +90,15 @@ const SET_SPECS: SetSpec[] = [
 const MAX_EDGE = 1600 // dłuższy bok strony/obrazu po przeskalowaniu
 // Poniżej tej ceny promocja jest niewiarygodna (błąd odczytu) — nie zapisujemy jej ani nie używamy w przepisach
 const MIN_PRICE = 0.3
-// Po tylu stronach bez ani jednego produktu spożywczego uznajemy, że to nie jest
-// gazetka z jedzeniem. Nazwy nic nie zdradzają („Hity i inspiracje", „BIEK"),
-// a metadanych Biedronka nie podaje — więc rozstrzyga treść, nie tytuł.
-// Sześć stron, bo pierwsze bywają okładką i stroną redakcyjną bez cen.
+// Awaryjna kontrola treści dla wydań, których sieć nie oznaczyła jako FOOD
+// ani NONFOOD (u Biedronki: starsza przeglądarka flexpaper).
+//
+// Warunek „zero produktów" był za słaby: katalog niespożywczy prawie zawsze ma
+// jakieś słodycze albo napoje, więc próg nigdy nie strzelał i czytaliśmy
+// wszystkie dwadzieścia kilka stron. Liczy się GĘSTOŚĆ — gazetka spożywcza daje
+// kilkanaście pozycji na stronę, katalog z patelniami pojedyncze sztuki.
 const STRON_NA_ROZPOZNANIE = 6
+const MIN_PRODUKTOW_NA_ROZPOZNANIU = 8
 
 const PAGES_PER_REQUEST = 1 // jedna strona na żądanie — mniejsze ciało, mniej błędów sieci
 
@@ -523,7 +527,11 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
 
           // Gazetka niespożywcza: przerywamy po kilku stronach zamiast mielić
           // czterdzieści i płacić za każdą wysłaną do modelu.
-          if (przerwijGdyPusto && merged.length === 0 && b + 1 >= STRON_NA_ROZPOZNANIE) {
+          if (
+            przerwijGdyPusto &&
+            merged.length < MIN_PRODUKTOW_NA_ROZPOZNANIU &&
+            b + 1 >= STRON_NA_ROZPOZNANIE
+          ) {
             niespozywcza = true
             break
           }
@@ -541,7 +549,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
 
       if (niespozywcza) {
         throw new Error(
-          `Pominięto — na pierwszych ${STRON_NA_ROZPOZNANIE} stronach nie ma produktów spożywczych.`
+          `Pominięto — na pierwszych ${STRON_NA_ROZPOZNANIE} stronach znaleziono zbyt mało produktów spożywczych (wygląda na katalog niespożywczy).`
         )
       }
       if (merged.length === 0) {
