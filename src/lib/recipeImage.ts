@@ -7,9 +7,16 @@ const BUCKET = 'recipe-images'
 // wystarcza, a przy setkach przepisów różnica w koszcie wobec większych modeli jest realna.
 const MODEL = 'black-forest-labs/flux-schnell'
 
-// Replicate potrafi odpowiedzieć synchronicznie (Prefer: wait) — bez tego trzeba by
-// odpytywać w pętli, co przy limicie 60 s funkcji na Vercelu jest ryzykowne.
-const REPLICATE_WAIT_S = 25
+// Pomiar na żywym koncie: Prefer: wait=25 KONSEKWENTNIE nie starcza — predykcja
+// wraca po ~27 s ze stanem „processing", a zdjęcie jest gotowe jakieś dwie sekundy
+// później. Poleganie na samym nagłówku oznaczało więc brak zdjęcia przy każdej
+// próbie. Dlatego czekamy krótko, a potem dopytujemy.
+//
+// Odkąd generowanie zdjęcia ma własne żądanie (patrz /api/generate-image), mamy
+// na to pełne 60 s Vercela zamiast resztek po generowaniu przepisu.
+const REPLICATE_WAIT_S = 10
+const POLL_CO_MS = 1500
+const POLL_DO_MS = 45_000
 const DOWNLOAD_TIMEOUT_MS = 20_000
 
 /**
@@ -56,8 +63,35 @@ export async function generateRecipeImage(
       return { url: null, warning: `Nie udało się wygenerować zdjęcia: ${data.error ?? 'nieznany błąd'}` }
     }
 
-    // Przy Prefer: wait zwykle jest już 'succeeded'; gdy model nie zdążył, output bywa pusty
-    const imageUrl: string | undefined = Array.isArray(data.output) ? data.output[0] : data.output
+    let imageUrl: string | undefined = Array.isArray(data.output) ? data.output[0] : data.output
+
+    // Nagłówek wait się nie doczekał — dopytujemy o gotowy wynik. To normalna droga,
+    // nie awaryjna: w pomiarach predykcja kończyła się tuż po zamknięciu okna.
+    const pollUrl: string | undefined = data?.urls?.get
+    if (!imageUrl && pollUrl && (data.status === 'processing' || data.status === 'starting')) {
+      const koniec = Date.now() + POLL_DO_MS
+      while (Date.now() < koniec) {
+        await new Promise((r) => setTimeout(r, POLL_CO_MS))
+        try {
+          const p = await fetch(pollUrl, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(10_000),
+          })
+          if (!p.ok) continue
+          const stan = await p.json()
+          if (stan.status === 'failed' || stan.status === 'canceled') {
+            return { url: null, warning: `Generowanie zdjęcia zakończone stanem ${stan.status}.` }
+          }
+          if (stan.status === 'succeeded') {
+            imageUrl = Array.isArray(stan.output) ? stan.output[0] : stan.output
+            break
+          }
+        } catch {
+          // Pojedyncze nieudane dopytanie nie kończy sprawy — próbujemy dalej
+        }
+      }
+    }
+
     if (!imageUrl) return { url: null, warning: 'Generator zdjęć nie zdążył w wyznaczonym czasie.' }
 
     const img = await fetch(imageUrl, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
