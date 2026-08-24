@@ -1,11 +1,12 @@
-// Budowanie promptu do ręcznego wygenerowania zdjęcia przepisu.
+// Budowanie promptu do zdjęcia przepisu.
 //
 // Prompt z generatora (`image_prompt` w ai.ts) nie jest zapisywany w bazie — powstaje
 // przy tworzeniu szkicu, idzie prosto do Fluxa i przepada. Dla przepisów, którym
 // zdjęcia zabrakło, odtwarzamy go więc z tego, co w bazie zostało: tytułu i składników.
 //
-// Prompt jest po polsku celowo. Tłumaczenie „mizerii", „kopytek" czy „klusek śląskich"
-// na angielski gubi danie albo tworzy potworka, a ChatGPT rozumie polski bez problemu.
+// Kierunek fotograficzny jest po ANGIELSKU, bo Flux rozumie angielskie terminy
+// fotograficzne nieporównanie lepiej. Nazwa dania zostaje po polsku — tłumaczenie
+// „mizerii" czy „kopytek" gubi danie albo tworzy potworka.
 
 export interface PromptIngredient {
   name: string
@@ -15,27 +16,33 @@ export interface PromptIngredient {
 /** Ile składników wymieniamy w prompcie. Więcej zaśmieca kadr i model zaczyna je gubić. */
 const MAX_WIDOCZNYCH = 4
 
-// Wspólna część stylu. Trafia do każdego promptu, żeby zdjęcia z różnych dni
-// wyglądały jak jedna sesja, a nie zbieranina.
-const STYL = [
-  'Rustykalny drewniany stół, miękkie naturalne światło z okna z lewej strony,',
-  'płytka głębia ostrości, kadr z góry pod lekkim kątem, obiektyw 50 mm, f/2.8.',
+// Kierunek spisany z referencyjnego zdjęcia, które wygląda jak prawdziwa fotografia:
+// ujęcie pod kątem (NIE płasko z góry), kremowy talerz w cętki, lniana serweta,
+// drugi plan rozmyty, światło z okna z boku.
+const SCENA = [
+  'three-quarter overhead angle, plated on a cream speckled ceramic plate,',
+  'linen napkin under the plate, rustic weathered wooden table,',
+  'small ceramic bowls and a glass of water blurred in the background,',
+  'soft diffused daylight from a window on the left, shallow depth of field,',
+  '50mm lens at f/2.8, natural muted colors, editorial food photography.',
 ].join(' ')
 
-// Antyartefakty. Ręce i palce to najczęstszy wpadkowy element AI, napisy i logotypy
-// wychodzą jako bełkot, a „hiperrealistyczny 8k" pcha obraz w plastikowy render —
-// dlatego prosimy o zwykłą fotografię, nie o maksymalną jakość.
+// Ślady jedzenia — bez nich talerz wygląda jak wizualizacja producenta, a nie obiad.
 const REALIZM = [
-  'Danie ma wyglądać na zrobione w domu: naturalne nierówności, okruchy,',
-  'lekkie przypieczenia, nierówno nałożone porcje, ślady sosu na talerzu.',
-  'Bez ludzi, bez rąk i palców, bez napisów, etykiet, logotypów i znaków wodnych.',
-  'Bez sztućców w ruchu, bez idealnej symetrii.',
-  'Zwykła realistyczna fotografia kulinarna do artykułu — nie render 3D,',
-  'nie grafika cyfrowa, nie zdjęcie stockowe, bez efektu przesadnej ostrości.',
+  'Home-cooked look: uneven portions, scattered fresh herbs,',
+  'a few sauce drips on the plate rim, slightly browned edges.',
 ].join(' ')
 
-/** Nagłówek pliku — zasady wspólne dla całej serii, do jednorazowego wklejenia */
-export const WSPOLNY_STYL = [STYL, REALIZM].join(' ')
+// Antyartefakty. „hyperrealistic", „8k" i „ultra detailed" celowo NIE występują —
+// pchają obraz w plastikowy render zamiast w fotografię.
+const CZEGO_NIE_MA = [
+  'No raw or loose ingredients around the plate, no people, no hands,',
+  'no text, no labels, no logos, no watermark, no cutlery in motion,',
+  'not a 3D render, not oversaturated, not a glossy stock photo.',
+].join(' ')
+
+/** Nagłówek pliku eksportu — zasady wspólne dla całej serii, do jednorazowego wklejenia */
+export const WSPOLNY_STYL = [SCENA, REALIZM, CZEGO_NIE_MA].join(' ')
 
 // Składniki, które po ugotowaniu przestają być sobą. Mąka staje się kluską, bułka
 // tarta panierką — wypisane wprost każą modelowi domalować kopczyk mąki obok dania.
@@ -79,12 +86,13 @@ export function widoczneSkladniki(ingredients: PromptIngredient[] = []): string[
 /** Gotowy, samodzielny prompt dla jednego przepisu */
 export function buildImagePrompt(title: string, ingredients: PromptIngredient[] = []): string {
   const widoczne = widoczneSkladniki(ingredients)
-  // „Przygotowane z", a nie „na talerzu widać": część składników zmienia postać
-  // podczas gotowania, a dosłowne „widać jajka" przy schabowym każe modelowi
-  // położyć obok kotleta surowe jajko.
+
+  // „Ugotowane i nałożone", a nie „widać składniki": model maluje dosłownie to,
+  // co wymienisz, więc sama lista produktów daje surowe warzywa wokół talerza
+  // zamiast obiadu. Ta jedna różnica decyduje o tym, czy zdjęcie wygląda jak jedzenie.
   const skladniki = widoczne.length
-    ? ` Danie przygotowane z: ${widoczne.join(', ')}.`
+    ? ` Served on the plate, cooked and plated: ${widoczne.join(', ')}.`
     : ''
 
-  return `Zdjęcie kulinarne gotowego dania: ${title}.${skladniki} ${WSPOLNY_STYL}`
+  return `Photograph of a finished Polish home-cooked dish: ${title}.${skladniki} ${WSPOLNY_STYL}`
 }

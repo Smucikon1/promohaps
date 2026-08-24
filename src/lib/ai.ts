@@ -90,15 +90,27 @@ const MIN_OPAKOWANIE: { wzorzec: RegExp; min: number; opak: string }[] = [
 ]
 
 /** Pozycje wycenione poniżej realnej ceny opakowania — czyli policzone „za sztukę" */
-function cenyZaSztuke(ingredients: any[]): string[] {
-  return (ingredients ?? [])
-    .filter((i) => i?.name && typeof i.price === 'number' && i.price > 0)
-    .map((i) => {
-      const trafienie = MIN_OPAKOWANIE.find((m) => m.wzorzec.test(String(i.name)))
-      if (!trafienie || i.price >= trafienie.min) return null
-      return `${i.name} za ${i.price.toFixed(2)} zł (to cena za sztukę — ${trafienie.opak} kosztuje co najmniej ${trafienie.min.toFixed(2)} zł)`
-    })
-    .filter(Boolean) as string[]
+/**
+ * Podnosi ceny policzone „za sztukę" do realnej ceny opakowania.
+ *
+ * Wcześniej to była tylko kontrola: znaleziona cena za sztukę oznaczała odrzucenie
+ * przepisu i ponowienie, a po dwóch próbach — utratę całej generacji. Kosztowało to
+ * ponad czterdzieści sekund pracy za jajko wycenione na 79 groszy.
+ *
+ * Skoro znamy minimalną cenę opakowania, nie ma czego zgadywać ani o co pytać modelu
+ * drugi raz — po prostu ją wpisujemy. Zwracamy listę poprawek, żeby było wiadomo,
+ * co zmieniliśmy, i żeby suma dała się przeliczyć od nowa.
+ */
+function poprawCenyZaSztuke(ingredients: any[]): string[] {
+  const poprawki: string[] = []
+  for (const i of ingredients ?? []) {
+    if (!i?.name || typeof i.price !== 'number' || i.price <= 0) continue
+    const trafienie = MIN_OPAKOWANIE.find((m) => m.wzorzec.test(String(i.name)))
+    if (!trafienie || i.price >= trafienie.min) continue
+    poprawki.push(`${i.name}: ${i.price.toFixed(2)} → ${trafienie.min.toFixed(2)} zł (${trafienie.opak})`)
+    i.price = trafienie.min
+  }
+  return poprawki
 }
 
 function client() {
@@ -323,13 +335,29 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     '  (ma powstać dokładnie to danie, w klasycznej postaci); gdy zawiera kuchnię/technikę/porę,',
     '  trzymaj się tego kierunku.',
     '',
-    'ZDJĘCIE (image_prompt) — pisz PO ANGIELSKU, 1 zdanie, opis gotowego dania na talerzu:',
-    '  co widać (danie + kluczowe składniki), naczynie, tło, światło. Wzór:',
-    '  "overhead shot of roast pork loin sliced on a white plate with roasted potatoes and celery,',
-    '   fresh parsley, rustic wooden table, soft natural window light, shallow depth of field".',
-    '  Bez ludzi, bez rąk, bez napisów i logotypów. Ma wyglądać jak zdjęcie z bloga kulinarnego,',
-    '  nie jak render 3D ani zdjęcie stockowe z lat 2000.',
+    'ZDJĘCIE (image_prompt) — pisz PO ANGIELSKU, jedno długie zdanie.',
+    'To ma być opis GOTOWEGO, NAŁOŻONEGO DANIA — nie lista składników. Model maluje',
+    'dosłownie to, co wymienisz: „pork, potatoes, cucumber" da surowe produkty rozrzucone',
+    'wokół talerza zamiast obiadu. Opisuj postać, w jakiej składnik LEŻY NA TALERZU —',
+    'nie „ground meat", tylko „two golden-brown pan-fried meat patties";',
+    'nie „potatoes", tylko „buttery mashed potatoes with dill".',
     '',
+    'Schemat (kolejność ma znaczenie):',
+    '  1. three-quarter overhead food photograph of <danie> plated on a cream speckled ceramic plate',
+    '  2. co jest na talerzu — 2-4 elementy, każdy w postaci ugotowanej. Przy warzywach',
+    '     PODAJ SPOSÓB KROJENIA, bo bez tego model zgaduje: „thinly sliced cucumbers in',
+    '     sour cream\", nie „cucumber salad\"; „shredded cabbage\", nie „cabbage\".',
+    '  3. scattered fresh parsley, a few sauce drips on the plate rim, uneven portions',
+    '  4. linen napkin under the plate, rustic weathered wooden table, small ceramic bowls',
+    '     and a glass of water blurred in the background',
+    '  5. soft diffused daylight from a window on the left, shallow depth of field,',
+    '     50mm lens at f/2.8, natural muted colors, editorial food photography',
+    '  6. na koniec wykluczenia: no raw or loose ingredients around the plate, no people,',
+    '     no hands, no text, no labels, no logos, no watermark, not a 3D render,',
+    '     not oversaturated, not a glossy stock photo',
+    '',
+    'NIE używaj słów „hyperrealistic", „8k", „ultra detailed", „cinematic" — dają plastikowy',
+    'render zamiast fotografii. Ma wyglądać jak zdjęcie zrobione aparatem przy oknie w kuchni.',
     'SEZON (pole „sezon" w danych) — przepis czytany jest teraz, więc ma pasować do pory roku:',
     '  charakter dania i warzywa dobieraj do podanej pory. Nie proponuj grzejących gulaszy',
     '  i grochówek w lipcu ani chłodników i sałatek z pomidorów w styczniu.',
@@ -399,7 +427,10 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     // co już jest w katalogu tego sklepu („Schabowy z ziemniakami" przy istniejącym
     // „Kotlet schabowy z młodymi ziemniakami"). Instrukcja to za mało — sprawdzamy sami.
     const duplicate = findDuplicateTitle(recipe.title ?? '', avoidTitles)
-    const zaSztuke = cenyZaSztuke(recipe.ingredients ?? [])
+    // Ceny za sztukę poprawiamy PRZED policzeniem sumy — inaczej budżet liczyłby się
+    // od kwot, których w sklepie nie zapłacisz, i przepuszczałby zbyt drogie przepisy.
+    const poprawione = poprawCenyZaSztuke(recipe.ingredients ?? [])
+    if (poprawione.length) console.warn('[ceny za sztuke poprawione]', poprawione.join(' | '))
     // Na ostatniej próbie dopuszczamy niewielkie przekroczenie — patrz TOLERANCJA_CENY.
     const limitTeraz = attempt === 1 ? MAX_RECIPE_PRICE * TOLERANCJA_CENY : MAX_RECIPE_PRICE
     const overBudget = recipe.price_total > limitTeraz
@@ -410,11 +441,11 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
       .filter((i: any) => typeof i?.price !== 'number' && i?.name && !isPantryStaple(i.name))
       .map((i: any) => i.name)
 
-    if (!overBudget && !tooManyIngredients && unpricedNonStaples.length === 0 && !duplicate && zaSztuke.length === 0) return recipe
+    if (!overBudget && !tooManyIngredients && unpricedNonStaples.length === 0 && !duplicate) return recipe
 
     const problems = [
       duplicate ? `ten przepis powiela istniejący już w tym sklepie: „${duplicate}"` : '',
-      zaSztuke.length ? `ceny policzone za sztukę zamiast za opakowanie: ${zaSztuke.join('; ')}` : '',
+
       overBudget
         ? `suma wyszła ${recipe.price_total.toFixed(2)} zł — trzeba ściąć o ${(recipe.price_total - CEL_CENOWY).toFixed(2)} zł, żeby zejść do ${CEL_CENOWY} zł`
         : '',
@@ -441,11 +472,6 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
         (duplicate
           ? 'DUPLIKAT jest tu najważniejszy: zrób INNE danie, nie wariant tego samego. ' +
             'Zmiana szyku słów w tytule ani dodanie dodatku to nadal ten sam przepis. '
-          : '') +
-        (zaSztuke.length
-          ? 'Ceny za sztukę popraw na ceny CAŁYCH OPAKOWAŃ z półki — użytkownik nie ma tych ' +
-            'produktów w domu i musi kupić całe opakowanie. Podnieś te ceny, a jeśli przez to ' +
-            'przekroczysz budżet, uprość danie zamiast zaniżać ceny. '
           : '') +
         'Przerób go: tańsze białko, mniej pozycji spoza gazetki, mniejsze opakowania. ' +
         'NIE zaniżaj cen — zmień składniki. ' +
