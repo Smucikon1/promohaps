@@ -113,6 +113,73 @@ function poprawCenyZaSztuke(ingredients: any[]): string[] {
   return poprawki
 }
 
+// Ile trzeba NA JEDNĄ PORCJĘ, żeby danie realnie najadło. Wartości z domowego
+// gotowania, nie z restauracji — schab 130 g to normalny kotlet, nie plasterek.
+//
+// `sztuka` mówi, ile waży jedna sztuka, gdy przepis liczy w sztukach: udko to
+// około 200 g, więc na cztery porcje potrzeba czterech udek, a nie jednego.
+const NA_PORCJE: { wzorzec: RegExp; gram: number; sztuka?: number; nazwa: string }[] = [
+  { wzorzec: /\budk|podudz|cwiartk|skrzydel/i, gram: 200, sztuka: 200, nazwa: 'udka' },
+  { wzorzec: /mieso mielon|\bmielon/i, gram: 125, nazwa: 'mięso mielone' },
+  { wzorzec: /schab|\bkark|lopatk/i, gram: 130, nazwa: 'wieprzowina' },
+  { wzorzec: /filet z kurcz|piers z kurcz|\bfilet\b/i, gram: 130, sztuka: 150, nazwa: 'filet' },
+  { wzorzec: /\bwolow|gulaszow|\bzraz/i, gram: 130, nazwa: 'wołowina' },
+  { wzorzec: /kielbas/i, gram: 100, nazwa: 'kiełbasa' },
+  { wzorzec: /losos|dorsz|mintaj|mirun|\bryb/i, gram: 130, sztuka: 130, nazwa: 'ryba' },
+]
+
+/** Zamienia ilość z przepisu na gramy. null = nie da się ustalić, wtedy nie ruszamy. */
+function naGramy(amount: unknown, unit: unknown, sztuka?: number): number | null {
+  const liczba = Number.parseFloat(String(amount ?? '').replace(',', '.'))
+  if (!Number.isFinite(liczba) || liczba <= 0) return null
+  const u = String(unit ?? '').toLowerCase().trim()
+  if (/^kg/.test(u)) return liczba * 1000
+  if (/^(g|gram)/.test(u)) return liczba
+  if (/^(szt|sztuk|opak)/.test(u) && sztuka) return liczba * sztuka
+  return null
+}
+
+/**
+ * Podnosi ilość białka, gdy nie starcza na deklarowaną liczbę porcji.
+ *
+ * Model potrafi napisać „1 udko" przy servings: 4 — a użytkownik kupuje wtedy jedno
+ * udko na cztery osoby. To błąd, którego się nie wybacza: przepis jest bezużyteczny,
+ * a wina spada na serwis.
+ *
+ * Poprawiamy ILOŚĆ, nie cenę, bo cena i tak dotyczy CAŁEGO OPAKOWANIA — użytkownik
+ * kupuje tacę udek niezależnie od tego, ile ich zje. Podniesienie ilości nie zmienia
+ * więc rachunku, a czyni przepis wykonalnym.
+ */
+function poprawIlosci(ingredients: any[], servings: number): string[] {
+  const porcje = Number.isFinite(servings) && servings > 0 ? servings : 4
+  const poprawki: string[] = []
+
+  for (const i of ingredients ?? []) {
+    if (!i?.name) continue
+    const reg = NA_PORCJE.find((m) => m.wzorzec.test(String(i.name)))
+    if (!reg) continue
+
+    const mamy = naGramy(i.amount, i.unit, reg.sztuka)
+    if (mamy == null) continue // nie wiemy ile jest — nie zgadujemy
+
+    const trzeba = porcje * reg.gram
+    if (mamy >= trzeba * 0.85) continue // 15% tolerancji, przepis to nie apteka
+
+    const u = String(i.unit ?? '').toLowerCase()
+    if (/^(szt|sztuk)/.test(u) && reg.sztuka) {
+      const ile = Math.ceil(trzeba / reg.sztuka)
+      poprawki.push(`${i.name}: ${i.amount} → ${ile} ${i.unit} (${porcje} porcji)`)
+      i.amount = String(ile)
+    } else {
+      const gram = Math.ceil(trzeba / 50) * 50
+      poprawki.push(`${i.name}: ${i.amount} ${i.unit} → ${gram} g (${porcje} porcji)`)
+      i.amount = String(gram)
+      i.unit = 'g'
+    }
+  }
+  return poprawki
+}
+
 function client() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('Brak ANTHROPIC_API_KEY w konfiguracji serwera.')
@@ -308,6 +375,11 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     '  mniej pozycji spoza gazetki, oprzyj danie na 2–3 produktach promocyjnych zamiast pięciu.',
     'PORCJE dobierz do wielkości kupionych opakowań, nie odwrotnie — skoro kupujesz 500 g mięsa',
     '  i kilogram ziemniaków, to wychodzi obiad dla 4 osób, a nie dla 2. Typowo servings = 4.',
+    'ILOŚĆ BIAŁKA MUSI STARCZYĆ NA WSZYSTKIE PORCJE — to najczęstszy błąd, jaki popełniasz.',
+    '  Na JEDNĄ porcję licz: mięso lub ryba 120–150 g, mięso mielone ok. 125 g, kiełbasa ok. 100 g.',
+    '  Przy produktach liczonych w sztukach: JEDNO udko/podudzie NA OSOBĘ, jeden filet na osobę.',
+    '  Czyli przy servings: 4 to są 4 udka albo 500–600 g mięsa, NIGDY jedno udko czy 200 g.',
+    '  Cena i tak dotyczy całego opakowania, więc większa ilość NIE podnosi rachunku.',
     'PROSTOTA (równie ważna jak cena): 5–8 składników łącznie, maksymalnie 10.',
     '  Zwykłe produkty z każdego sklepu — żadnych niszowych, drogich czy „wymyślnych" dodatków',
     '  (bez pinii, świeżej bazylii poza sezonem, parmezanu, wina do gotowania, egzotycznych przypraw).',
@@ -431,6 +503,11 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     // od kwot, których w sklepie nie zapłacisz, i przepuszczałby zbyt drogie przepisy.
     const poprawione = poprawCenyZaSztuke(recipe.ingredients ?? [])
     if (poprawione.length) console.warn('[ceny za sztuke poprawione]', poprawione.join(' | '))
+
+    // Ilości poprawiamy po cenach, ale przed sumą — zmiana ilości nie rusza ceny
+    // (płacisz za opakowanie), więc kolejność jest tu obojętna dla budżetu.
+    const iloscPoprawiona = poprawIlosci(recipe.ingredients ?? [], recipe.servings)
+    if (iloscPoprawiona.length) console.warn('[ilosci poprawione]', iloscPoprawiona.join(' | '))
     // Na ostatniej próbie dopuszczamy niewielkie przekroczenie — patrz TOLERANCJA_CENY.
     const limitTeraz = attempt === 1 ? MAX_RECIPE_PRICE * TOLERANCJA_CENY : MAX_RECIPE_PRICE
     const overBudget = recipe.price_total > limitTeraz
