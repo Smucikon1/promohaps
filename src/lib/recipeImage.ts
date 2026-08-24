@@ -30,7 +30,13 @@ export async function generateRecipeImage(
   supabase: ServerSupabase
 ): Promise<{ url: string | null; warning?: string }> {
   const token = process.env.REPLICATE_API_TOKEN
-  if (!token) return { url: null } // funkcja wyłączona — cisza, nie błąd
+  if (!token) {
+    // Wczesniej byla tu cicha cisza: brak tokena zwracal null bez slowa, a interfejs
+    // pokazywal ogolne "nie udalo sie wygenerowac" - nie do odroznienia od awarii
+    // modelu. Przy generowaniu wsadowym to poprawne (przepis ma powstac mimo braku
+    // zdjecia), ale komunikat musi mowic, czego brakuje.
+    return { url: null, warning: "Brak REPLICATE_API_TOKEN — ustaw go w zmiennych srodowiskowych (lokalnie .env.local, na produkcji panel Vercela) i przeladuj serwer." }
+  }
   if (!prompt?.trim()) return { url: null, warning: 'Model nie zwrócił opisu zdjęcia.' }
 
   try {
