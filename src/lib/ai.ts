@@ -14,6 +14,24 @@ import {
 // Obietnica serwisu: tanio i prosto. Przepis łamiący którykolwiek limit jest
 // odrzucany zamiast publikowany — admin generuje ponownie (koszt jednego wywołania).
 export const MAX_RECIPE_PRICE = 30
+
+/**
+ * Kwota, o którą PROSIMY model. Celowo niższa od limitu.
+ *
+ * Przy celu równym limitowi model lądował tuż nad nim — pomiar na żywych danych
+ * dał 30,45 zł i 36,43 zł na trzy próby. Prosząc o 24 zł zostawiamy zapas na
+ * naturalny rozrzut, więc większość trafia pod limit bez ponawiania.
+ */
+const CEL_CENOWY = 24
+
+/**
+ * O ile wolno przekroczyć limit, gdy po ponowieniu nadal nie zeszło poniżej.
+ *
+ * Bez tego przepis za 30,45 zł szedł do kosza razem z czterdziestoma sekundami
+ * pracy — a 45 groszy ponad limit nie psuje obietnicy taniego gotowania tak,
+ * jak psuje ją brak przepisu. Powyżej tego progu nadal odrzucamy.
+ */
+const TOLERANCJA_CENY = 1.12
 export const MAX_INGREDIENTS = 10
 // Popularne danie za 29 zł nie jest okazją. Miękki cel dla klasyków — twardym limitem
 // pozostaje MAX_RECIPE_PRICE, pilnowanym w pętli walidacji.
@@ -50,20 +68,25 @@ function isPantryStaple(name: string): boolean {
 // Model trzyma się reguły całych opakowań wszędzie poza produktami liczonymi na sztuki:
 // „2 jajka" mapuje mu się odruchowo na 0,70 zł za jajko, choć w sklepie kupuje się
 // dziesiątkę. Sama instrukcja w prompcie tego nie załatwia — stąd twarda kontrola.
+// Progi celowo NISKIE. Ten test ma łapać ceny policzone ZA SZTUKĘ — jajko za 70 gr,
+// bułkę za 50 gr — a nie produkty, które po prostu są tanie na promocji. Pierwsza
+// wersja odrzucała masło za 3,49 zł jako „cenę jednostkową" i wyrzucała gotowy
+// przepis razem z czterdziestoma sekundami pracy, choć taka cena jest w gazetce
+// całkiem realna. Cena za sztukę to okolice złotówki, nie trzech.
 const MIN_OPAKOWANIE: { wzorzec: RegExp; min: number; opak: string }[] = [
-  { wzorzec: /\bjajk|\bjaja\b|\bjaj\b/i, min: 5, opak: 'opakowanie 10 sztuk' },
-  { wzorzec: /\bmasl|\bmasł/i, min: 4.5, opak: 'kostka 200 g' },
-  { wzorzec: /\bser\s|\bsera\b|gouda|edamsk|mozzarell/i, min: 4, opak: 'opakowanie ok. 250 g' },
-  { wzorzec: /twarog|twaróg/i, min: 3, opak: 'kostka 250 g' },
-  { wzorzec: /smietan|śmietan/i, min: 2, opak: 'kubek 400 g' },
-  { wzorzec: /\bmleko\b|\bmleka\b/i, min: 2.5, opak: 'karton 1 l' },
-  { wzorzec: /jogurt|kefir|maslank|maślank/i, min: 1.8, opak: 'opakowanie' },
-  { wzorzec: /makaron/i, min: 2.5, opak: 'paczka 400–500 g' },
-  { wzorzec: /\bryz\b|\bryż\b|\bryzu\b|\bryżu\b/i, min: 3, opak: 'paczka 1 kg' },
-  { wzorzec: /\bkasza|\bkaszy\b/i, min: 2.5, opak: 'paczka 400 g' },
-  { wzorzec: /passat|koncentrat pomidor|pomidory z puszki|pomidory w puszce/i, min: 2, opak: 'opakowanie' },
-  { wzorzec: /kielbas|kiełbas/i, min: 5, opak: 'opakowanie' },
-  { wzorzec: /bulk[aię]|bułk/i, min: 1.5, opak: 'opakowanie' },
+  { wzorzec: /\bjajk|\bjaja\b|\bjaj\b/i, min: 3.5, opak: 'opakowanie 10 sztuk' },
+  { wzorzec: /\bmasl|\bmasł/i, min: 2.5, opak: 'kostka 200 g' },
+  { wzorzec: /\bser\s|\bsera\b|gouda|edamsk|mozzarell/i, min: 2.5, opak: 'opakowanie ok. 250 g' },
+  { wzorzec: /twarog|twaróg/i, min: 1.8, opak: 'kostka 250 g' },
+  { wzorzec: /smietan|śmietan/i, min: 1.2, opak: 'kubek 400 g' },
+  { wzorzec: /\bmleko\b|\bmleka\b/i, min: 1.5, opak: 'karton 1 l' },
+  { wzorzec: /jogurt|kefir|maslank|maślank/i, min: 1, opak: 'opakowanie' },
+  { wzorzec: /makaron/i, min: 1.5, opak: 'paczka 400–500 g' },
+  { wzorzec: /\bryz\b|\bryż\b|\bryzu\b|\bryżu\b/i, min: 1.8, opak: 'paczka 1 kg' },
+  { wzorzec: /\bkasza|\bkaszy\b/i, min: 1.5, opak: 'paczka 400 g' },
+  { wzorzec: /passat|koncentrat pomidor|pomidory z puszki|pomidory w puszce/i, min: 1.2, opak: 'opakowanie' },
+  { wzorzec: /kielbas|kiełbas/i, min: 3, opak: 'opakowanie' },
+  { wzorzec: /bulk[aię]|bułk/i, min: 1, opak: 'opakowanie' },
 ]
 
 /** Pozycje wycenione poniżej realnej ceny opakowania — czyli policzone „za sztukę" */
@@ -263,7 +286,9 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     'ANTY-UBOGI PRZEPIS: mimo taniości danie ma być pełnowartościowe — musi mieć źródło białka (mięso/ryba/strączki/nabiał/jajka),',
     '  bazę węglowodanową (ziemniaki/ryż/makaron/kasza/pieczywo) i warzywa/owoce. Nie tylko sama sałatka z pomidora.',
     '',
-    'BUDŻET — TWARDY LIMIT 30 zł NA PARAGONIE (najważniejsza reguła serwisu):',
+    `BUDŻET — CELUJ W ${CEL_CENOWY} zł, TWARDY LIMIT ${MAX_RECIPE_PRICE} zł (najważniejsza reguła serwisu):`,
+    `  Projektuj przepis pod ${CEL_CENOWY} zł, nie pod sam limit — przy celowaniu w limit`,
+    '  wynik regularnie ląduje tuż nad nim i przepis trzeba wyrzucić.',
     '  suma price wszystkich składników (bez tych z price: null) MUSI wyjść ≤ 30 zł. Bez wyjątków.',
     '  Zanim zwrócisz JSON: ZSUMUJ price wszystkich ingredients. Jeśli > 30 zł — przerób przepis.',
     '  Nie mieść się w limicie przez zaniżanie cen ani przez wpisywanie null poza listą „z szafki".',
@@ -375,7 +400,9 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     // „Kotlet schabowy z młodymi ziemniakami"). Instrukcja to za mało — sprawdzamy sami.
     const duplicate = findDuplicateTitle(recipe.title ?? '', avoidTitles)
     const zaSztuke = cenyZaSztuke(recipe.ingredients ?? [])
-    const overBudget = recipe.price_total > MAX_RECIPE_PRICE
+    // Na ostatniej próbie dopuszczamy niewielkie przekroczenie — patrz TOLERANCJA_CENY.
+    const limitTeraz = attempt === 1 ? MAX_RECIPE_PRICE * TOLERANCJA_CENY : MAX_RECIPE_PRICE
+    const overBudget = recipe.price_total > limitTeraz
     const tooManyIngredients = (recipe.ingredients ?? []).length > MAX_INGREDIENTS
     // Bez ceny może zostać wyłącznie sól/pieprz/olej itp. Inaczej rachunek pokazany
     // użytkownikowi byłby niższy od tego, co naprawdę zapłaci przy kasie.
@@ -388,7 +415,9 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     const problems = [
       duplicate ? `ten przepis powiela istniejący już w tym sklepie: „${duplicate}"` : '',
       zaSztuke.length ? `ceny policzone za sztukę zamiast za opakowanie: ${zaSztuke.join('; ')}` : '',
-      overBudget ? `suma wyszła ${recipe.price_total.toFixed(2)} zł (limit ${MAX_RECIPE_PRICE} zł)` : '',
+      overBudget
+        ? `suma wyszła ${recipe.price_total.toFixed(2)} zł — trzeba ściąć o ${(recipe.price_total - CEL_CENOWY).toFixed(2)} zł, żeby zejść do ${CEL_CENOWY} zł`
+        : '',
       tooManyIngredients ? `użyto ${recipe.ingredients.length} składników (limit ${MAX_INGREDIENTS})` : '',
       unpricedNonStaples.length
         ? `brak ceny przy składnikach spoza listy „z szafki": ${unpricedNonStaples.join(', ')} — każdy z nich musi mieć cenę opakowania`

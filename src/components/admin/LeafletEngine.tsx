@@ -899,6 +899,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     let used = [...usedProducts]
     let tytuly: string[] = []
     let failed = 0
+    const przyczyny: string[] = []
     let noImage = 0
 
     for (let i = 0; i < zadania.length; i++) {
@@ -914,8 +915,12 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         tytuly = [...tytuly, r.draft.title]
         setDrafts((d) => [r.draft, ...d])
         if (r.imageWarning) noImage++
-      } catch {
+      } catch (e: any) {
         failed++
+        // Bez zapamiętania przyczyny komunikat mówi tylko „nie udało się",
+        // a to zbyt mało, żeby cokolwiek naprawić.
+        if (przyczyny.length < 3) przyczyny.push(e?.message ?? String(e))
+        console.warn('[zestaw]', e)
       }
     }
 
@@ -923,7 +928,11 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     setImageNotice(noImage > 0 ? `${noImage} z ${zadania.length} przepisów powstało bez zdjęcia — dodasz je ręcznie przy akceptacji.` : '')
     setBatchStatus('')
     setGenerating(false)
-    if (failed > 0) setError(`Zestaw gotowy, ale ${failed} z ${zadania.length} przepisów się nie udało — spróbuj wygenerować je pojedynczo.`)
+    if (failed > 0)
+      setError(
+        `Nie udało się ${failed} z ${zadania.length} przepisów. Przyczyna: ${przyczyny[0] ?? "nieznana"}` +
+          (przyczyny.length > 1 ? ` (i ${przyczyny.length - 1} inne — szczegóły w konsoli, F12)` : '')
+      )
     else setSavedMsg(`✅ Wygenerowano ${zadania.length} klasyków — sprawdź i opublikuj.`)
   }
 
@@ -936,6 +945,7 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     const pool = products.filter((p) => p.name && p.price_promo != null)
     let used = [...usedProducts]
     let failed = 0
+    const przyczyny: string[] = []
     let noImage = 0
     for (let i = 0; i < SET_SPECS.length; i++) {
       const spec = SET_SPECS[i]
@@ -948,15 +958,21 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         used = r.used
         setDrafts((d) => [r.draft, ...d]) // pokazuj na bieżąco
         if (r.imageWarning) noImage++
-      } catch {
+      } catch (e: any) {
         failed++
+        if (przyczyny.length < 3) przyczyny.push(e?.message ?? String(e))
+        console.warn('[zestaw]', e)
       }
     }
     setUsedProducts(used)
     setImageNotice(noImage > 0 ? `${noImage} z ${SET_SPECS.length} przepisów powstało bez zdjęcia — dodasz je ręcznie przy akceptacji.` : '')
     setBatchStatus('')
     setGenerating(false)
-    if (failed > 0) setError(`Zestaw gotowy, ale ${failed} z ${SET_SPECS.length} przepisów się nie udało — spróbuj wygenerować je pojedynczo.`)
+    if (failed > 0)
+      setError(
+        `Nie udało się ${failed} z ${SET_SPECS.length} przepisów. Przyczyna: ${przyczyny[0] ?? "nieznana"}` +
+          (przyczyny.length > 1 ? ` (i ${przyczyny.length - 1} inne — szczegóły w konsoli, F12)` : '')
+      )
     else setSavedMsg(`✅ Wygenerowano zestaw ${SET_SPECS.length} szkiców — sprawdź i opublikuj.`)
   }
 
