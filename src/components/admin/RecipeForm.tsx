@@ -4,7 +4,8 @@ import { revalidateCatalog } from '@/app/actions/revalidate'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Plus, Trash2, Upload, X, Sparkles } from 'lucide-react'
+import { buildImagePrompt } from '@/lib/imagePrompt'
+import { Loader2, Plus, Trash2, Upload, X, Sparkles, Copy, Check } from 'lucide-react'
 import type { Store, Category } from '@/types'
 import { CategoryIcon } from '@/components/recipe/CategoryIcon'
 import { cn } from '@/lib/utils'
@@ -44,6 +45,8 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
   const [imageUrl, setImageUrl] = useState(seed?.image_url ?? '')
   const [generujeZdjecie, setGenerujeZdjecie] = useState(false)
   const [bladZdjecia, setBladZdjecia] = useState('')
+  const [skopiowano, setSkopiowano] = useState(false)
+  const [promptDoRecznego, setPromptDoRecznego] = useState('')
   const [storeId, setStoreId] = useState(seed?.store_id ?? '')
   const [selectedCategories, setSelectedCategories] = useState<string[]>(seed?.category_ids ?? [])
   const [prepTime, setPrepTime] = useState(seed?.prep_time_min?.toString() ?? '')
@@ -220,6 +223,35 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
    * Wymaga zapisanego przepisu, bo trasa pracuje na jego identyfikatorze i sama
    * zapisuje wynik do bazy — dlatego przy nowym przepisie przycisk jest wyłączony.
    */
+  /**
+   * Buduje prompt do wklejenia w zewnętrzny generator i kopiuje go do schowka.
+   *
+   * W formularzu cena składnika jest TEKSTEM (pole input), a buildImagePrompt
+   * odsiewa produkty „z szafki" po tym, że cena jest liczbą — bez konwersji
+   * prompt wyszedłby bez ani jednego składnika.
+   */
+  const kopiujPrompt = async () => {
+    const skladniki = ingredients
+      .filter((i: any) => String(i.name ?? '').trim())
+      .map((i: any) => ({
+        name: String(i.name).trim(),
+        price: i.price === '' || i.price == null ? null : Number.parseFloat(String(i.price)),
+      }))
+
+    const prompt = buildImagePrompt(title || 'danie', skladniki)
+
+    try {
+      await navigator.clipboard.writeText(prompt)
+      setSkopiowano(true)
+      setPromptDoRecznego('')
+      window.setTimeout(() => setSkopiowano(false), 2500)
+    } catch {
+      // Schowek bywa zablokowany (brak HTTPS, uprawnienia) — wtedy pokazujemy
+      // tekst do zaznaczenia ręcznie, zamiast zostawiać użytkownika z niczym.
+      setPromptDoRecznego(prompt)
+    }
+  }
+
   const generujZdjecie = async () => {
     if (!recipe?.id) return
     setGenerujeZdjecie(true)
@@ -297,6 +329,17 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
             <Sparkles className={`w-4 h-4 ${generujeZdjecie ? 'animate-pulse' : ''}`} />
             {generujeZdjecie ? 'Generuję zdjęcie…' : 'Wygeneruj AI'}
           </button>
+
+          {/* Ten sam prompt, którego używa generator — do wklejenia w ChatGPT
+              albo dowolne inne narzędzie, gdy chcesz zrobić zdjęcie po swojemu. */}
+          <button
+            type="button"
+            onClick={kopiujPrompt}
+            className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 transition-colors hover:border-stone-300"
+          >
+            {skopiowano ? <Check className="w-4 h-4 text-[#12b76a]" /> : <Copy className="w-4 h-4" />}
+            {skopiowano ? 'Skopiowano' : 'Kopiuj prompt'}
+          </button>
           <label className="cursor-pointer flex items-center gap-2 btn-outline text-sm">
             <Upload className="w-4 h-4" />
             {imageUploading ? 'Wgrywanie...' : 'Prześlij zdjęcie'}
@@ -304,6 +347,21 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
           </label>
           <span className="text-xs text-stone-400">PNG, JPG, WEBP · maks. 5 MB</span>
         </div>
+        {promptDoRecznego && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-stone-500">
+              Schowek jest zablokowany — zaznacz i skopiuj ręcznie:
+            </p>
+            <textarea
+              readOnly
+              value={promptDoRecznego}
+              onFocus={(e) => e.currentTarget.select()}
+              rows={4}
+              className="w-full rounded-xl border border-stone-200 p-3 text-xs text-stone-700"
+            />
+          </div>
+        )}
+
         {bladZdjecia && (
           <p className="rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{bladZdjecia}</p>
         )}
