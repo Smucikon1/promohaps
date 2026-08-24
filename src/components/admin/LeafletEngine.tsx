@@ -176,6 +176,9 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
   const [theme, setTheme] = useState('')
   const [adresGazetki, setAdresGazetki] = useState('')
   const [dostepne, setDostepne] = useState<any[] | null>(null)
+  // Które wydania wczytać razem. Dotąd było albo jedno, albo wszystkie —
+  // a sieci wypuszczają obok gazetki spożywczej rzeczy, których nie chcesz.
+  const [zaznaczone, setZaznaczone] = useState<Set<string>>(new Set())
   // Postęp całego przebiegu: odczyt → zapis → trzy zestawy przepisów.
   // batchStatus pokazuje szczegół bieżącego kroku, to — który krok z ilu.
   const [etap, setEtap] = useState<{ nazwa: string; nr: number; z: number } | null>(null)
@@ -729,6 +732,40 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
    * po 60 sekundach, a sam odczyt kilku gazetek to grubo więcej. Karta może pracować
    * dowolnie długo i pokazywać postęp — serwer dostaje wiele krótkich żądań.
    */
+  /**
+   * Wczytuje wybrane wydania jedno po drugim, scalając produkty w jedną listę.
+   * Ten sam produkt w dwóch gazetkach zostaje raz, po niższej cenie — patrz `scal`.
+   */
+  const wczytajZaznaczone = async () => {
+    const wybrane = (dostepne ?? []).filter((g: any) => zaznaczone.has(g.strona))
+    if (wybrane.length === 0) return
+
+    setError('')
+    setSavedMsg('')
+    setProducts([])
+    let udane = 0
+
+    for (let i = 0; i < wybrane.length; i++) {
+      const g = wybrane[i]
+      setEtap({ nazwa: `Czytam: ${g.tytul}`, nr: i + 1, z: wybrane.length })
+      try {
+        // dopisz = true od drugiej gazetki, żeby produkty się sumowały
+        await wczytajZnaleziona(g, i > 0)
+        udane++
+      } catch {
+        // Jedno nieudane wydanie nie może zabrać pozostałych
+      }
+    }
+
+    setEtap(null)
+    setZaznaczone(new Set())
+    if (udane === 0) {
+      setError('Nie udało się odczytać żadnej z zaznaczonych gazetek.')
+    } else if (udane < wybrane.length) {
+      setSavedMsg(`Wczytano ${udane} z ${wybrane.length} gazetek — sprawdź listę produktów.`)
+    }
+  }
+
   const zrobWszystko = async () => {
     setError('')
     setSavedMsg('')
@@ -1023,8 +1060,22 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
               {dostepne.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-stone-500">Nie znaleziono wydań.</p>
               ) : (
-                dostepne.map((g: any) => (
-                  <div key={g.strona} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <>
+                {dostepne.map((g: any) => (
+                  <div key={g.strona} className="flex items-center gap-3 px-4 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={zaznaczone.has(g.strona)}
+                      onChange={(e) => {
+                        const next = new Set(zaznaczone)
+                        if (e.target.checked) next.add(g.strona)
+                        else next.delete(g.strona)
+                        setZaznaczone(next)
+                      }}
+                      disabled={extracting}
+                      aria-label={`Zaznacz ${g.tytul}`}
+                      className="h-4 w-4 flex-shrink-0 accent-[#12b76a]"
+                    />
                     {/* Nazwa i okres w osobnych kolumnach: przy Lidlu wszystkie
                         wydania nazywają się „Gazetka" i dopiero daty je rozróżniają */}
                     <div className="min-w-0 flex-1">
@@ -1048,7 +1099,30 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
                       Wczytaj
                     </button>
                   </div>
-                ))
+                ))}
+                {zaznaczone.size > 0 && (
+                  <div className="flex flex-wrap items-center gap-3 bg-stone-50 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={wczytajZaznaczone}
+                      disabled={extracting}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#12b76a] px-4 py-2 text-sm font-bold text-white hover:bg-[#0ea25d] disabled:opacity-50"
+                    >
+                      Wczytaj zaznaczone ({zaznaczone.size})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZaznaczone(new Set())}
+                      className="text-sm font-medium text-stone-500 hover:text-stone-800"
+                    >
+                      Odznacz
+                    </button>
+                    <span className="text-xs text-stone-500">
+                      Produkty ze wszystkich zaznaczonych trafią na jedną listę.
+                    </span>
+                  </div>
+                )}
+                </>
               )}
             </div>
           )}
