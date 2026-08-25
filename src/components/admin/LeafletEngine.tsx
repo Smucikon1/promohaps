@@ -900,6 +900,10 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     let tytuly: string[] = []
     let failed = 0
     const przyczyny: string[] = []
+    // Duplikaty pod rząd znaczą, że w gazetce nie ma z czego zrobić kolejnych dań.
+    // Bez tego licznika każdy z pozostałych przepisów szedł przez dwie próby po ~40 s,
+    // żeby polec z tego samego powodu — kwadrans czekania i rachunek za nic.
+    let duplikatyPodRzad = 0
     let noImage = 0
 
     for (let i = 0; i < zadania.length; i++) {
@@ -915,12 +919,16 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         tytuly = [...tytuly, r.draft.title]
         setDrafts((d) => [r.draft, ...d])
         if (r.imageWarning) noImage++
+        duplikatyPodRzad = 0
       } catch (e: any) {
         failed++
         // Bez zapamiętania przyczyny komunikat mówi tylko „nie udało się",
         // a to zbyt mało, żeby cokolwiek naprawić.
-        if (przyczyny.length < 3) przyczyny.push(e?.message ?? String(e))
+        const powod = e?.message ?? String(e)
+        if (przyczyny.length < 3) przyczyny.push(powod)
         console.warn('[zestaw]', e)
+        duplikatyPodRzad = /powielaj|duplikat/i.test(powod) ? duplikatyPodRzad + 1 : 0
+        if (duplikatyPodRzad >= 3) break
       }
     }
 
@@ -930,8 +938,12 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     setGenerating(false)
     if (failed > 0)
       setError(
-        `Nie udało się ${failed} z ${zadania.length} przepisów. Przyczyna: ${przyczyny[0] ?? "nieznana"}` +
-          (przyczyny.length > 1 ? ` (i ${przyczyny.length - 1} inne — szczegóły w konsoli, F12)` : '')
+        duplikatyPodRzad >= 3
+          ? `Przerwano: model nie ma z czego zrobić kolejnych różnych dań. ` +
+            `W puli jest ${promoPayload().length} produktów, a katalog tego sklepu ma już podobne przepisy. ` +
+            `Wgraj kolejną gazetkę albo wygeneruj pojedynczo z własnym tematem.`
+          : `Nie udało się ${failed} z ${zadania.length} przepisów. Przyczyna: ${przyczyny[0] ?? "nieznana"}` +
+            (przyczyny.length > 1 ? ` (i ${przyczyny.length - 1} inne — szczegóły w konsoli, F12)` : '')
       )
     else setSavedMsg(`✅ Wygenerowano ${zadania.length} klasyków — sprawdź i opublikuj.`)
   }
@@ -946,6 +958,10 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     let used = [...usedProducts]
     let failed = 0
     const przyczyny: string[] = []
+    // Duplikaty pod rząd znaczą, że w gazetce nie ma z czego zrobić kolejnych dań.
+    // Bez tego licznika każdy z pozostałych przepisów szedł przez dwie próby po ~40 s,
+    // żeby polec z tego samego powodu — kwadrans czekania i rachunek za nic.
+    let duplikatyPodRzad = 0
     let noImage = 0
     for (let i = 0; i < SET_SPECS.length; i++) {
       const spec = SET_SPECS[i]
@@ -958,10 +974,14 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
         used = r.used
         setDrafts((d) => [r.draft, ...d]) // pokazuj na bieżąco
         if (r.imageWarning) noImage++
+        duplikatyPodRzad = 0
       } catch (e: any) {
         failed++
-        if (przyczyny.length < 3) przyczyny.push(e?.message ?? String(e))
+        const powod = e?.message ?? String(e)
+        if (przyczyny.length < 3) przyczyny.push(powod)
         console.warn('[zestaw]', e)
+        duplikatyPodRzad = /powielaj|duplikat/i.test(powod) ? duplikatyPodRzad + 1 : 0
+        if (duplikatyPodRzad >= 3) break
       }
     }
     setUsedProducts(used)
@@ -970,8 +990,12 @@ export function LeafletEngine({ stores }: { stores: Store[] }) {
     setGenerating(false)
     if (failed > 0)
       setError(
-        `Nie udało się ${failed} z ${SET_SPECS.length} przepisów. Przyczyna: ${przyczyny[0] ?? "nieznana"}` +
-          (przyczyny.length > 1 ? ` (i ${przyczyny.length - 1} inne — szczegóły w konsoli, F12)` : '')
+        duplikatyPodRzad >= 3
+          ? `Przerwano: model nie ma z czego zrobić kolejnych różnych dań. ` +
+            `W puli jest ${promoPayload().length} produktów, a katalog tego sklepu ma już podobne przepisy. ` +
+            `Wgraj kolejną gazetkę albo wygeneruj pojedynczo z własnym tematem.`
+          : `Nie udało się ${failed} z ${SET_SPECS.length} przepisów. Przyczyna: ${przyczyny[0] ?? "nieznana"}` +
+            (przyczyny.length > 1 ? ` (i ${przyczyny.length - 1} inne — szczegóły w konsoli, F12)` : '')
       )
     else setSavedMsg(`✅ Wygenerowano zestaw ${SET_SPECS.length} szkiców — sprawdź i opublikuj.`)
   }
