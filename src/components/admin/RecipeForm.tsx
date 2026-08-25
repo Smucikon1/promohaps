@@ -135,7 +135,18 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
     )
   }
 
-  const handleSave = async () => {
+  /**
+   * @param wymusPublikacje Ustawia is_published niezależnie od przełącznika w formularzu.
+   *
+   * Parametr, a nie setIsPublished(true) przed zapisem, bo stan Reacta aktualizuje się
+   * asynchronicznie — zapis poleciałby ze STARĄ wartością i przepis zostałby szkicem.
+   *
+   * Porównanie jest jawne (=== true), bo handleSave bywa podpięte wprost pod onClick,
+   * a wtedy React wstawia tu zdarzenie myszy. Bez tego każdy zwykły zapis publikowałby
+   * przepis, bo obiekt zdarzenia jest prawdziwy logicznie.
+   */
+  const handleSave = async (wymusPublikacje?: unknown) => {
+    const publikuj = wymusPublikacje === true ? true : isPublished
     if (!title || !storeId) { setError('Wypełnij nazwę przepisu i wybierz sklep.'); return }
     setSaving(true)
     setError('')
@@ -148,7 +159,7 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
       difficulty,
       servings: servings ? parseInt(servings) : null,
       price_total: priceTotal ? parseFloat(priceTotal) : null,
-      is_published: isPublished,
+      is_published: publikuj,
       meta_title: metaTitle || null,
       meta_description: metaDesc || null,
     }
@@ -365,6 +376,20 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
           >
             <Sparkles className={`w-4 h-4 ${generujeZdjecie ? 'animate-pulse' : ''}`} />
             {generujeZdjecie ? 'Generuję zdjęcie…' : 'Wygeneruj AI'}
+          </button>
+
+          {/* Skrót kończący pracę nad przepisem: zapis, publikacja i powrót do listy
+              jednym kliknięciem. Stoi przy zdjęciu, bo to zwykle ostatnia rzecz,
+              którą się uzupełnia — bez tego trzeba zjechać na sam dół formularza,
+              przestawić przełącznik i dopiero zapisać. */}
+          <button
+            type="button"
+            onClick={() => handleSave(true)}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-xl bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-900 disabled:opacity-50"
+          >
+            <Check className="w-4 h-4" />
+            {saving ? 'Zapisuję…' : 'Zapisz, publikuj i zamknij'}
           </button>
 
           {/* Ten sam prompt, którego używa generator — do wklejenia w ChatGPT
@@ -637,7 +662,7 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
           <button type="button" onClick={() => router.back()} className="btn-outline">
             Anuluj
           </button>
-          <button type="button" onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-50">
+          <button type="button" onClick={() => handleSave()} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-50">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {isEdit ? 'Zapisz zmiany' : 'Utwórz przepis'}
           </button>
