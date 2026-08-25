@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateRecipeImage } from '@/lib/recipeImage'
 import { buildImagePrompt } from '@/lib/imagePrompt'
+import { dishOfTitle } from '@/lib/popularDishes'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -40,6 +41,49 @@ export async function POST(request: Request) {
   // w formularzu podaje force, bo tam podmiana jest właśnie tym, o co prosisz.
   if (recipe.image_url && body?.force !== true) {
     return NextResponse.json({ hasImage: true, pominiete: 'przepis ma już zdjęcie' })
+  }
+
+  // ZANIM cokolwiek wygenerujemy: może to danie ma już zdjęcie w katalogu.
+  //
+  // Schabowy wygląda jak schabowy — dziesiąte zdjęcie tego samego dania nie wnosi nic,
+  // a kosztuje i czas, i pieniądze. Adres jest publiczny, więc wystarczy wpisać ten sam
+  // image_url; nic nie kopiujemy w storage.
+  //
+  // Pomijamy to przy force — jeśli ktoś kliknął „Wygeneruj AI", chce NOWEGO zdjęcia,
+  // a nie podstawienia cudzego.
+  if (body?.force !== true) {
+    const danie = dishOfTitle(recipe.title ?? '')
+    if (danie) {
+      const { data: zeZdjeciem } = await supabase
+        .from('recipes')
+        .select('id, title, image_url')
+        .not('image_url', 'is', null)
+        .neq('image_url', '')
+        .neq('id', recipeId)
+        .order('created_at', { ascending: false })
+        .limit(300)
+
+      const bliznjak = (zeZdjeciem ?? []).find(
+        (r: any) => dishOfTitle(r.title ?? '')?.nazwa === danie.nazwa
+      )
+
+      if (bliznjak?.image_url) {
+        const { error: updErr } = await supabase
+          .from('recipes')
+          .update({ image_url: bliznjak.image_url })
+          .eq('id', recipeId)
+
+        if (!updErr) {
+          return NextResponse.json({
+            hasImage: true,
+            imageUrl: bliznjak.image_url,
+            ponownieUzyte: true,
+            zPrzepisu: bliznjak.title,
+          })
+        }
+        // Gdy zapis się nie uda, lecimy dalej i generujemy normalnie
+      }
+    }
   }
 
   // Prompt z generatora jest po angielsku i lepiej opisuje kadr, więc gdy klient go

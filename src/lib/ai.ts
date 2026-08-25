@@ -159,23 +159,42 @@ function poprawIlosci(ingredients: any[], servings: number): string[] {
     const reg = NA_PORCJE.find((m) => m.wzorzec.test(String(i.name)))
     if (!reg) continue
 
+    const u = String(i.unit ?? '').toLowerCase().trim()
+    const liczba = Number.parseFloat(String(i.amount ?? '').replace(',', '.'))
+
+    // ŚCIEŻKA SZTUKOWA — produkty, których nikt nie dzieli na pół.
+    //
+    // Udka, filety i kotlety liczy się na osoby, nie na gramy: dwa udka na cztery
+    // osoby to nie „trochę za mało", tylko dwie osoby bez obiadu. Nikt nie przekroi
+    // udka, więc minimum to JEDNA SZTUKA NA PORCJĘ, zaokrąglona w górę.
+    //
+    // Jednostkę rozpoznajemy też wtedy, gdy jej brakuje — model potrafi zostawić
+    // puste pole przy „2 udka", a wtedy liczenie w gramach nic nie da.
+    const sztukowe = reg.sztuka != null
+    const jednostkaSztuk = /^(szt|sztuk|kawal|udk|piers|filet)/.test(u) || (u === "" && sztukowe)
+
+    if (sztukowe && jednostkaSztuk) {
+      if (!Number.isFinite(liczba) || liczba <= 0) continue
+      // Zapotrzebowanie w sztukach: nigdy mniej niż jedna na porcję
+      const trzebaSztuk = Math.max(porcje, Math.ceil((porcje * reg.gram) / reg.sztuka!))
+      if (liczba >= trzebaSztuk) continue
+      poprawki.push(`${i.name}: ${i.amount} → ${trzebaSztuk} ${i.unit || 'szt.'} (${porcje} porcji, sztuk nie dzielimy)`)
+      i.amount = String(trzebaSztuk)
+      if (!u) i.unit = 'szt.'
+      continue
+    }
+
+    // ŚCIEŻKA WAGOWA — mięso mielone, kiełbasa, wszystko sprzedawane na wagę
     const mamy = naGramy(i.amount, i.unit, reg.sztuka)
     if (mamy == null) continue // nie wiemy ile jest — nie zgadujemy
 
     const trzeba = porcje * reg.gram
     if (mamy >= trzeba * 0.85) continue // 15% tolerancji, przepis to nie apteka
 
-    const u = String(i.unit ?? '').toLowerCase()
-    if (/^(szt|sztuk)/.test(u) && reg.sztuka) {
-      const ile = Math.ceil(trzeba / reg.sztuka)
-      poprawki.push(`${i.name}: ${i.amount} → ${ile} ${i.unit} (${porcje} porcji)`)
-      i.amount = String(ile)
-    } else {
-      const gram = Math.ceil(trzeba / 50) * 50
-      poprawki.push(`${i.name}: ${i.amount} ${i.unit} → ${gram} g (${porcje} porcji)`)
-      i.amount = String(gram)
-      i.unit = 'g'
-    }
+    const gram = Math.ceil(trzeba / 50) * 50
+    poprawki.push(`${i.name}: ${i.amount} ${i.unit} → ${gram} g (${porcje} porcji)`)
+    i.amount = String(gram)
+    i.unit = 'g'
   }
   return poprawki
 }
@@ -377,7 +396,9 @@ export async function generateRecipeJson(input: GenerateRecipeInput): Promise<an
     '  i kilogram ziemniaków, to wychodzi obiad dla 4 osób, a nie dla 2. Typowo servings = 4.',
     'ILOŚĆ BIAŁKA MUSI STARCZYĆ NA WSZYSTKIE PORCJE — to najczęstszy błąd, jaki popełniasz.',
     '  Na JEDNĄ porcję licz: mięso lub ryba 120–150 g, mięso mielone ok. 125 g, kiełbasa ok. 100 g.',
-    '  Przy produktach liczonych w sztukach: JEDNO udko/podudzie NA OSOBĘ, jeden filet na osobę.',
+    '  SZTUK NIE DZIELIMY: nikt nie przekroi udka ani kotleta na pół, więc przy produktach',
+    '  liczonych na sztuki minimum to JEDNA SZTUKA NA PORCJĘ — cztery porcje to cztery udka,',
+    '  cztery filety, cztery kotlety. Nigdy dwa udka „na cztery osoby".',
     '  Czyli przy servings: 4 to są 4 udka albo 500–600 g mięsa, NIGDY jedno udko czy 200 g.',
     '  Cena i tak dotyczy całego opakowania, więc większa ilość NIE podnosi rachunku.',
     'PROSTOTA (równie ważna jak cena): 5–8 składników łącznie, maksymalnie 10.',
