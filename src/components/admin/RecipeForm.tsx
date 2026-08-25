@@ -46,6 +46,7 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
   const [generujeZdjecie, setGenerujeZdjecie] = useState(false)
   const [bladZdjecia, setBladZdjecia] = useState('')
   const [skopiowano, setSkopiowano] = useState(false)
+  const [podobne, setPodobne] = useState<any[]>([])
   const [promptDoRecznego, setPromptDoRecznego] = useState('')
   const [storeId, setStoreId] = useState(seed?.store_id ?? '')
   const [selectedCategories, setSelectedCategories] = useState<string[]>(seed?.category_ids ?? [])
@@ -230,6 +231,42 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
    * odsiewa produkty „z szafki" po tym, że cena jest liczbą — bez konwersji
    * prompt wyszedłby bez ani jednego składnika.
    */
+  /**
+   * Szuka zdjęć z już istniejących przepisów tego samego dania.
+   *
+   * Schabowy wygląda jak schabowy — generowanie go dziesiąty raz kosztuje i czas,
+   * i pieniądze, a w katalogu leży gotowe zdjęcie. Adres jest publiczny, więc
+   * „użycie" to wpisanie tego samego image_url; nic nie kopiujemy w storage.
+   *
+   * Szukamy tylko dla przepisów BEZ zdjęcia — przy istniejącym podpowiadanie
+   * podmiany byłoby natrętne.
+   */
+  useEffect(() => {
+    if (imageUrl || title.trim().length < 3) {
+      setPodobne([])
+      return
+    }
+    let aktualne = true
+    const t = window.setTimeout(async () => {
+      try {
+        const res = await fetch('/api/podobne-zdjecia', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, excludeId: recipe?.id }),
+        })
+        const dane = await res.json().catch(() => ({}))
+        if (aktualne) setPodobne(dane?.zdjecia ?? [])
+      } catch {
+        if (aktualne) setPodobne([])
+      }
+      // Odpytujemy z opóźnieniem, żeby nie strzelać przy każdej literze w tytule
+    }, 600)
+    return () => {
+      aktualne = false
+      window.clearTimeout(t)
+    }
+  }, [title, imageUrl, recipe?.id])
+
   const kopiujPrompt = async () => {
     const skladniki = ingredients
       .filter((i: any) => String(i.name ?? '').trim())
@@ -347,6 +384,33 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
           </label>
           <span className="text-xs text-stone-400">PNG, JPG, WEBP · maks. 5 MB</span>
         </div>
+        {podobne.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
+            <p className="text-xs font-semibold text-stone-600">
+              Zdjęcia z podobnych przepisów — kliknij, żeby użyć zamiast generować nowe
+            </p>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              {podobne.map((z: any) => (
+                <button
+                  key={z.id}
+                  type="button"
+                  onClick={() => setImageUrl(z.imageUrl)}
+                  title={z.title}
+                  className="group relative overflow-hidden rounded-lg border-2 border-transparent transition-colors hover:border-[#12b76a]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={z.imageUrl} alt={z.title} className="aspect-[3/2] w-full object-cover" />
+                  {z.toSamoDanie && (
+                    <span className="absolute left-1 top-1 rounded bg-[#12b76a] px-1 py-0.5 text-[9px] font-bold text-white">
+                      to samo danie
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {promptDoRecznego && (
           <div className="space-y-1.5">
             <p className="text-xs text-stone-500">
