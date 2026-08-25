@@ -46,6 +46,7 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
   const [generujeZdjecie, setGenerujeZdjecie] = useState(false)
   const [bladZdjecia, setBladZdjecia] = useState('')
   const [skopiowano, setSkopiowano] = useState(false)
+  const [powiekszone, setPowiekszone] = useState<string | null>(null)
   const [podobne, setPodobne] = useState<any[]>([])
   const [promptDoRecznego, setPromptDoRecznego] = useState('')
   const [storeId, setStoreId] = useState(seed?.store_id ?? '')
@@ -224,6 +225,28 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
     }
 
     setDirty(false)
+
+    // Po opublikowaniu skaczemy prosto do kolejnego szkicu, zamiast wracać na listę
+    // i szukać, co dalej. Przy kilkudziesięciu pozycjach w kolejce to różnica między
+    // przeglądaniem a przeklikiwaniem.
+    if (publikuj === true) {
+      const { data: nastepny } = await supabase
+        .from('recipes')
+        .select('id')
+        .eq('is_published', false)
+        .neq('id', recipeId ?? '')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (nastepny?.id) {
+        router.push(`/admin/przepisy/${nastepny.id}?saved=publish`)
+        await revalidateCatalog()
+        router.refresh()
+        return
+      }
+    }
+
     router.push(`/admin/przepisy?saved=${isEdit ? 'edit' : 'new'}`)
     await revalidateCatalog()
     router.refresh()
@@ -277,6 +300,15 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
       window.clearTimeout(t)
     }
   }, [title, imageUrl, recipe?.id])
+
+  // Esc zamyka powiększenie — bez tego jedynym wyjściem jest trafienie w tło,
+  // co przy zdjęciu na pół ekranu bywa uciążliwe.
+  useEffect(() => {
+    if (!powiekszone) return
+    const naKlawisz = (e: KeyboardEvent) => { if (e.key === 'Escape') setPowiekszone(null) }
+    window.addEventListener('keydown', naKlawisz)
+    return () => window.removeEventListener('keydown', naKlawisz)
+  }, [powiekszone])
 
   const kopiujPrompt = async () => {
     const skladniki = ingredients
@@ -409,6 +441,31 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
           </label>
           <span className="text-xs text-stone-400">PNG, JPG, WEBP · maks. 5 MB</span>
         </div>
+        {powiekszone && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Powiększone zdjęcie"
+            onClick={() => setPowiekszone(null)}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 cursor-zoom-out"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={powiekszone}
+              alt="Powiększone zdjęcie przepisu"
+              className="max-h-full max-w-full rounded-xl object-contain"
+            />
+            <button
+              type="button"
+              onClick={() => setPowiekszone(null)}
+              aria-label="Zamknij powiększenie"
+              className="absolute right-4 top-4 rounded-full bg-white/90 p-2 text-stone-800 hover:bg-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {podobne.length > 0 && (
           <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
             <p className="text-xs font-semibold text-stone-600">
@@ -458,7 +515,15 @@ export function RecipeForm({ stores, categories, recipe, initialData }: Props) {
         {imageUrl && (
           <div className="relative w-full max-w-xs">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="Podgląd zdjęcia przepisu" className="w-full rounded-xl object-cover aspect-video" />
+            <button
+              type="button"
+              onClick={() => setPowiekszone(imageUrl)}
+              title="Kliknij, żeby powiększyć"
+              className="block w-full cursor-zoom-in"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imageUrl} alt="Podgląd zdjęcia przepisu" className="w-full rounded-xl object-cover aspect-video" />
+            </button>
             <button
               type="button"
               onClick={() => setImageUrl('')}
