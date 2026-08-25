@@ -15,7 +15,7 @@ import {
 } from '@/lib/shopping'
 import { decodeShareList, encodeShareList, mergeShareIntoStorage, type ShareGroup } from '@/lib/shoppingShare'
 // Ten sam klucz co przy doborze zestawu — „Twaróg 250g" i „twaróg" mają być jednym produktem
-import { productKey } from '@/lib/weeklySet'
+import { productKey } from '@/lib/productKey'
 import { SuggestedRecipes } from '@/components/shopping/SuggestedRecipes'
 
 type FlatItem = ShoppingItem & { _key: string }

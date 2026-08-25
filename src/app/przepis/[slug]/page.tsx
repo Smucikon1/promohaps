@@ -16,7 +16,7 @@ import { RecordView } from '@/components/recipe/RecordView'
 import { RecentlyViewed } from '@/components/recipe/RecentlyViewed'
 import { dedupeRecipes, dishFingerprint } from '@/lib/recipeDedupe'
 import { RecipeCarousel } from '@/components/recipe/RecipeCarousel'
-import { productKey } from '@/lib/weeklySet'
+import { productKey } from '@/lib/productKey'
 
 interface Props {
   params: Promise<{ slug: string }>

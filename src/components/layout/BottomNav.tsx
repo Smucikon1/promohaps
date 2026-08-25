@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
-import { Home, ShoppingCart, Heart, ShoppingBasket } from 'lucide-react'
+import { Home, ShoppingCart, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { countShoppingRecipes, SHOPPING_EVENT } from '@/lib/shopping'
 import { countFavorites, FAVORITES_EVENT } from '@/lib/favorites'
@@ -41,7 +41,6 @@ export function BottomNav() {
   // czyli na telefonie nie dało się do niego dojść w ogóle.
   const tabs = [
     { href: '/', label: 'Przepisy', icon: Home, active: pathname === '/', badge: 0, fill: false },
-    { href: '/zestaw', label: 'Na tydzień', icon: ShoppingBasket, active: pathname === '/zestaw', badge: 0, fill: false },
     { href: '/lista-zakupow', label: 'Lista', icon: ShoppingCart, active: pathname === '/lista-zakupow', badge: cart, fill: false },
     { href: '/ulubione', label: 'Ulubione', icon: Heart, active: pathname === '/ulubione', badge: fav, fill: true },
   ]

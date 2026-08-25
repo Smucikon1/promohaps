@@ -9,9 +9,9 @@ import { countShoppingRecipes, SHOPPING_EVENT } from '@/lib/shopping'
 import { countFavorites, FAVORITES_EVENT } from '@/lib/favorites'
 import { SearchToggle } from '@/components/layout/SearchToggle'
 
-const NAV_LINKS: { href: string; label: string; exact?: boolean }[] = [
-  { href: '/zestaw', label: 'Zestaw na tydzień' },
-]
+// Pusta na razie — zestaw tygodniowy został usunięty. Zostawiamy strukturę,
+// bo nawigacja i tak wróci przy kolejnej sekcji serwisu.
+const NAV_LINKS: { href: string; label: string; exact?: boolean }[] = []
 
 export function Header() {
   const pathname = usePathname()
