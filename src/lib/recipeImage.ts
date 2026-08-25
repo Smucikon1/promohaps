@@ -5,7 +5,15 @@ type ServerSupabase = Awaited<ReturnType<typeof createClient>>
 const BUCKET = 'recipe-images'
 // flux-schnell: ~2 s i ułamek grosza za zdjęcie. Do fotografii jedzenia w zupełności
 // wystarcza, a przy setkach przepisów różnica w koszcie wobec większych modeli jest realna.
-const MODEL = 'black-forest-labs/flux-schnell'
+// Nano Banana (Gemini 2.5 Flash Image) zamiast flux-schnell.
+//
+// Porównanie na tym samym prompcie: flux renderował mizerię jako kostkę i plaster
+// limonki, nano-banana jako cienkie plastry ogórka w śmietanie — czyli to, co jest
+// w przepisie. Do tego było szybciej: 6,7 s bez odpytywania wobec ~15 s z jednym.
+//
+// Kosztuje wyraźnie więcej za sztukę, ale przy kilkudziesięciu przepisach miesięcznie
+// mówimy o kilku złotych, a zdjęcie jest pierwszą rzeczą, po której ocenia się przepis.
+const MODEL = 'google/nano-banana'
 
 // Pomiar na żywym koncie: Prefer: wait=25 KONSEKWENTNIE nie starcza — predykcja
 // wraca po ~27 s ze stanem „processing", a zdjęcie jest gotowe jakieś dwie sekundy
@@ -51,9 +59,9 @@ export async function generateRecipeImage(
         input: {
           prompt: prompt.trim(),
           aspect_ratio: '3:2', // proporcje kafelka przepisu
-          output_format: 'webp',
-          output_quality: 85,
-          num_outputs: 1,
+          // Nano Banana przyjmuje tylko prompt, image_input, aspect_ratio
+          // i output_format — output_quality ani num_outputs nie istnieją w jego API.
+          output_format: 'jpg',
         },
       }),
       signal: AbortSignal.timeout((REPLICATE_WAIT_S + 5) * 1000),
@@ -105,10 +113,10 @@ export async function generateRecipeImage(
     const bytes = await img.arrayBuffer()
 
     // Adresy z Replicate wygasają, więc trzymamy kopię u siebie
-    const path = `ai/${slug}-${Date.now()}.webp`
+    const path = `ai/${slug}-${Date.now()}.jpg`
     const { error: upErr } = await supabase.storage
       .from(BUCKET)
-      .upload(path, bytes, { contentType: 'image/webp', upsert: false })
+      .upload(path, bytes, { contentType: 'image/jpeg', upsert: false })
 
     if (upErr) return { url: null, warning: `Zapis zdjęcia do storage nie powiódł się: ${upErr.message}` }
 
